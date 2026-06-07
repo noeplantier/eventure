@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Universe",
+    "name": "Eventure",
     "slug": "frontend",
     "version": "1.0.0",
     "runtimeVersion": {
@@ -8,7 +8,7 @@
     },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "universe",
+    "scheme": "eventure",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "backgroundColor": "#03000A",
@@ -18,18 +18,18 @@
       "backgroundColor": "#03000A"
     },
     "ios": {
-      "bundleIdentifier": "com.universe.cinema",
+      "bundleIdentifier": "com.eventure.cinema",
       "supportsTablet": false,
       "requireFullScreen": true,
       "userInterfaceStyle": "dark",
       "backgroundColor": "#03000A",
       "buildNumber": "1",
       "infoPlist": {
-        "NSCameraUsageDescription": "Universe utilise la caméra pour filmer et importer vos créations cinématographiques.",
-        "NSMicrophoneUsageDescription": "Universe utilise le microphone pour enregistrer l'audio de vos vidéos.",
-        "NSPhotoLibraryUsageDescription": "Universe accède à votre galerie pour importer vos films, photos de profil et visuels de critiques.",
-        "NSPhotoLibraryAddUsageDescription": "Universe enregistre vos créations dans votre galerie photo.",
-        "NSLocationWhenInUseUsageDescription": "Universe peut utiliser votre position pour personnaliser les recommandations de festivals proches.",
+        "NSCameraUsageDescription": "eventure utilise la caméra pour filmer et importer vos créations cinématographiques.",
+        "NSMicrophoneUsageDescription": "eventure utilise le microphone pour enregistrer l'audio de vos vidéos.",
+        "NSPhotoLibraryUsageDescription": "eventure accède à votre galerie pour importer vos films, photos de profil et visuels de critiques.",
+        "NSPhotoLibraryAddUsageDescription": "eventure enregistre vos créations dans votre galerie photo.",
+        "NSLocationWhenInUseUsageDescription": "eventure peut utiliser votre position pour personnaliser les recommandations de festivals proches.",
         "UIBackgroundModes": ["audio", "fetch"],
         "NSAllowsArbitraryLoads": false,
         "ITSAppUsesNonExemptEncryption": false
@@ -44,7 +44,7 @@
       }
     },
     "android": {
-      "package": "com.universe.cinema",
+      "package": "com.eventure.cinema",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#03000A"
@@ -87,7 +87,7 @@
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/images/logouniverse2.png"
+      "favicon": "./assets/images/logoeventure2.png"
     },
     "plugins": [
       "expo-router",
@@ -104,22 +104,22 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Universe accède à votre galerie pour importer photos de profil, visuels de critiques et vidéos.",
-          "cameraPermission": "Universe utilise la caméra pour filmer vos créations cinématographiques.",
-          "microphonePermission": "Universe utilise le microphone pour enregistrer l'audio de vos vidéos."
+          "photosPermission": "eventure accède à votre galerie pour importer photos de profil, visuels de critiques et vidéos.",
+          "cameraPermission": "eventure utilise la caméra pour filmer vos créations cinématographiques.",
+          "microphonePermission": "eventure utilise le microphone pour enregistrer l'audio de vos vidéos."
         }
       ],
       [
         "expo-av",
         {
-          "microphonePermission": "Universe utilise le microphone pour l'enregistrement audio."
+          "microphonePermission": "eventure utilise le microphone pour l'enregistrement audio."
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "Universe utilise la caméra pour filmer vos créations.",
-          "microphonePermission": "Universe utilise le microphone pour vos vidéos.",
+          "cameraPermission": "eventure utilise la caméra pour filmer vos créations.",
+          "microphonePermission": "eventure utilise le microphone pour vos vidéos.",
           "recordAudioAndroid": true
         }
       ],
