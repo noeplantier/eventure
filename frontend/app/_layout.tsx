@@ -198,7 +198,7 @@ function useAuthGuard(ready: boolean) {
   useEffect(() => {
     if (!ready) return;
     supabase.auth.getSession().then(({ data: { session } }) => {
-      const inAuth = segments[0] === '(auth)' || segments[0] === 'login';
+      const inAuth = segments[0] === 'login';
       if (!session && !inAuth) {
         // router.replace('/login');
       }
