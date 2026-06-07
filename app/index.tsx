@@ -1,34 +1,39 @@
-import { StyleSheet, Text, View } from "react-native";
+import { useEffect } from 'react';
+import { useRouter } from 'expo-router';
+import { View, ActivityIndicator } from 'react-native';
+import { isMockMode } from '@/lib/supabase';
+import { MOCK_USER }  from '@/lib/mockData';
+import { supabase }   from '@/lib/supabase';
+import { COLORS }     from '@/constants/theme';
 
-export default function Page() {
+export default function Index() {
+  const router = useRouter();
+
+  useEffect(() => {
+    async function redirect() {
+      if (isMockMode) {
+        // En mode mock, rediriger selon le rôle de MOCK_USER
+        const role = MOCK_USER.role;
+        router.replace(role === 'organizer' ? '/(organizer)/dashboard' : '/(staff)/feed');
+        return;
+      }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { router.replace('/(auth)/welcome'); return; }
+      // Déterminer le rôle depuis Supabase
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+      const role = (profile as any)?.role ?? 'staff';
+      router.replace(role === 'organizer' ? '/(organizer)/dashboard' : '/(staff)/feed');
+    }
+    redirect();
+  }, []);
+
   return (
-    <View style={styles.container}>
-      <View style={styles.main}>
-        <Text style={styles.title}>Hello World</Text>
-        <Text style={styles.subtitle}>This is the first page of your app.</Text>
-      </View>
+    <View style={{ flex:1, backgroundColor:COLORS.bg, alignItems:'center', justifyContent:'center' }}>
+      <ActivityIndicator color={COLORS.violet} size="large" />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    padding: 24,
-  },
-  main: {
-    flex: 1,
-    justifyContent: "center",
-    maxWidth: 960,
-    marginHorizontal: "auto",
-  },
-  title: {
-    fontSize: 64,
-    fontWeight: "bold",
-  },
-  subtitle: {
-    fontSize: 36,
-    color: "#38434D",
-  },
-});

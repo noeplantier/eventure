@@ -1,29 +1,42 @@
 {
-  "plugins": [
-    "expo-router"
-  ],
-  "extra": {
-    "router": {
-      "origin": false
-    },
-    "eas": {
-      "projectId": "e6105903-0636-48d6-8a20-b099b211401d"
-    }
-  },
   "expo": {
-    "android": {
-      "package": "com.noeplantier.reactnativeapp"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "e6105903-0636-48d6-8a20-b099b211401d"
-      }
+    "name": "Eventure",
+    "slug": "eventure",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "eventure",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#070C17",
+    "splash": {
+      "backgroundColor": "#070C17"
     },
     "ios": {
-      "bundleIdentifier": "universe",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
+      "supportsTablet": false,
+      "bundleIdentifier": "com.eventure.app",
+      "backgroundColor": "#070C17"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#070C17"
+      },
+      "package": "com.eventure.app",
+      "backgroundColor": "#070C17"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "backgroundColor": "#070C17"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      ["expo-image-picker", { "photosPermission": "Eventure accède à vos photos." }],
+      ["expo-location", { "locationWhenInUsePermission": "Eventure utilise votre position pour les missions proches." }],
+      ["expo-camera", { "cameraPermission": "Eventure utilise la caméra pour les photos de profil." }]
+    ],
+    "experiments": {
+      "typedRoutes": true
     }
   }
 }
