@@ -1,11 +1,12 @@
-import { Redirect } from 'expo-router';
-import { useAuth } from '../contexts/AuthContext';
+import { useEffect } from 'react';
+import { useRouter } from 'expo-router';
 import { View, ActivityIndicator } from 'react-native';
-import { COLORS } from '../constants/theme';
+import { Redirect } from 'expo-router';
 
 export default function Index() {
-  
+  const router = useRouter();
 
-  // Always redirect to tabs - bypass auth for streaming experience
-  return <Redirect href="/(tabs)" />;
+    return <Redirect href="/(organizer)/dashboard"/>;
+  
 }
+
