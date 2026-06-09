@@ -659,21 +659,7 @@ export default function ApplicationsScreen() {
               <LiveDot/>
             </View>
           </View>
-          <View style={{flexDirection:'row',gap:8}}>
-            {(['recent','rating','rate'] as const).map(s=>(
-              <TouchableOpacity key={s}
-                style={[ds.navBtn,sortBy===s&&{backgroundColor:T.greenDim,borderColor:T.borderHi}]}
-                onPress={()=>setSortBy(s)} activeOpacity={0.75}>
-                <Ionicons
-                  name={s==='recent'?'time-outline':s==='rating'?'star-outline':'cash-outline'}
-                  size={13} color={sortBy===s?GREEN:T.muted}/>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity style={ds.navBtn}
-              onPress={()=>{setRefreshing(true);load();}} activeOpacity={0.75}>
-              <Ionicons name="refresh-outline" size={14} color={T.muted}/>
-            </TouchableOpacity>
-          </View>
+      
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false}
