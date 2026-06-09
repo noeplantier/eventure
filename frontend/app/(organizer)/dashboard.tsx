@@ -553,8 +553,8 @@ export default function Dashboard() {
             </View>
           </View>
           <View style={{flexDirection:'row',gap:9}}>
-            <TouchableOpacity style={ds.navBtn} onPress={()=>router.push('/(organizer)/staff-search' as any)} activeOpacity={0.78}>
-              <Ionicons name="people-outline" size={18} color={GREEN}/>
+            <TouchableOpacity style={ds.navBtn} onPress={()=>router.push('/(organizer)/missions' as any)} activeOpacity={0.78}>
+              <Ionicons name="clipboard-outline" size={18} color={GREEN}/>
             </TouchableOpacity>
             <TouchableOpacity style={[ds.navBtn,{backgroundColor:'rgba(0,217,126,0.15)',borderColor:T.borderHi}]}
               onPress={()=>router.push('/(organizer)/create-event' as any)} activeOpacity={0.82}>
@@ -788,7 +788,7 @@ export default function Dashboard() {
                 <View style={{flexDirection:'row',flexWrap:'wrap',gap:10}}>
                   {[
                     {l:'Créer une mission',  icon:'add-circle-outline' as const,  route:'/(organizer)/create-event', c:GREEN },
-                    {l:'Trouver du staff',   icon:'search-outline'      as const,  route:'/(organizer)/staff-search', c:GOLD  },
+                    {l:'Trouver du staff',   icon:'file-tray-stacked-outline'      as const,  route:'/(organizer)/missions', c:GOLD  },
                     {l:'Candidatures',       icon:'mail-outline'         as const,  route:'/(organizer)/applications', c:T.blue},
                     {l:'Mes missions',       icon:'briefcase-outline'    as const,  route:'/(organizer)/events',       c:T.amber},
                   ].map(({l,icon,route,c})=>(

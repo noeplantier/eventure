@@ -517,8 +517,8 @@ export default function OrganizerProfileScreen() {
                 </View>
                 <Text style={{color:T.white,fontSize:17,fontWeight:'800',textAlign:'center'}}>Aucun staff encore recruté</Text>
                 <Text style={{color:T.muted,fontSize:13,textAlign:'center'}}>Publiez des missions et acceptez des candidatures</Text>
-                <TouchableOpacity style={ps.createBtn} onPress={()=>router.push('/(organizer)/staff-search' as any)}>
-                  <Ionicons name="search-outline" size={14} color={GREEN}/>
+                <TouchableOpacity style={ps.createBtn} onPress={()=>router.push('/(organizer)/missions' as any)}>
+                  <Ionicons name="file-tray-stacked-outline" size={14} color={GREEN}/>
                   <Text style={{color:GREEN,fontSize:13,fontWeight:'800'}}>Explorer le catalogue</Text>
                 </TouchableOpacity>
               </View>
@@ -526,7 +526,7 @@ export default function OrganizerProfileScreen() {
               <>
                 <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
                   <Text style={ps.secLbl}>Équipe ({staff.length})</Text>
-                  <TouchableOpacity onPress={()=>router.push('/(organizer)/staff-search' as any)}><Text style={{color:GREEN,fontSize:11,fontWeight:'700'}}>+ Recruter</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={()=>router.push('/(organizer)/missions' as any)}><Text style={{color:GREEN,fontSize:11,fontWeight:'700'}}>+ Recruter</Text></TouchableOpacity>
                 </View>
                 {staff.map(s=><StaffRow key={s.id} s={s} onChat={()=>handleChat(s)}/>)}
               </>

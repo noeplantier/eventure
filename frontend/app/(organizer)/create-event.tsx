@@ -1183,7 +1183,7 @@ export default function CreateEventScreen() {
       {/* CTA bas */}
       <SafeAreaView
         edges={['bottom']}
-        style={{ backgroundColor:BG, borderTopWidth:StyleSheet.hairlineWidth, borderTopColor:T.border }}
+        style={{ backgroundColor:BG, borderTopWidth:StyleSheet.hairlineWidth, borderTopColor:T.border, marginBottom:80 }}
       >
         <View style={s.ctaRow}>
           {step < 3 && (

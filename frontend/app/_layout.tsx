@@ -315,7 +315,7 @@ export default function RootLayout() {
           options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom' }}/>
         <Stack.Screen name="(organizer)/applications"
           options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom' }}/>
-        <Stack.Screen name="(organizer)/staff-search"
+        <Stack.Screen name="(organizer)/missions"
           options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom' }}/>
         <Stack.Screen name="(organizer)/profile"
           options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom' }}/>

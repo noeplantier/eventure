@@ -9,7 +9,7 @@
  *
  * NAVIGATION ORGANISATEUR :
  *   Hub       → /(organizer)/dashboard     vue globale missions + stats
- *   Talents   → /(organizer)/staff-search  chercher du staff qualifié
+ *   Talents   → /(organizer)/missions  chercher du staff qualifié
  *   ✦ Poster  → /(organizer)/create-event  BOUTON CENTRAL — poster une mission
  *   Équipe    → /(organizer)/applications  candidatures + recrutés (badge)
  *   Agence    → /(organizer)/profile       mon agence / profil organisateur
@@ -257,9 +257,9 @@ import React, {
   
           {/* ── Talents — chercher du staff qualifié ── */}
           <NavItem
-            icon={<MaterialCommunityIcons name="account-search-outline" size={23} color={WHITE_78}/>}
-            label="Talents"
-            onPress={() => go('/(organizer)/staff-search')}
+            icon={<MaterialCommunityIcons name="clipboard-text-search-outline" size={23} color={WHITE_78}/>}
+            label="Missions"
+            onPress={() => go('/(organizer)/missions')}
           />
   
           {/* ── ✦ Bouton central — Poster une mission ── */}
