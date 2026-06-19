@@ -254,12 +254,14 @@ function useAntiScreenshot() {
 function NavBarWrapper() {
   const pathname = usePathname();
 
-  // Masquer sur les écrans plein-écran (identique Universe pour /reels)
-  const hidden =
-    pathname === '/(auth)/welcome'           ||
-    pathname === '/(auth)/login'             ||
-    pathname === '/(auth)/register'          ||
-    pathname === '/(organizer)/create-event' ;   // formulaire plein-écran
+  // Afficher UNIQUEMENT sur les 5 pages principales (tabs) de l'organisateur
+  const tabRoutes = [
+    '/dashboard', '/events', '/staff', '/missions', '/calendar',
+  ];
+  const isOnTab = tabRoutes.some(r => pathname.endsWith(r));
+
+  // Masquer sur les pages auth et toutes les sous-pages (push)
+  const hidden = pathname.includes('/(auth)') || !isOnTab;
 
   if (hidden) return null;
 
@@ -291,12 +293,12 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="light"/>
+      <StatusBar style="dark"/>
 
       <Stack
         screenOptions={{
           headerShown:      false,
-          contentStyle:     { backgroundColor: '#020A06' },
+          contentStyle:     { backgroundColor: '#F8FAFC' },
           animation:        Platform.OS === 'ios' ? 'default' : 'fade',
           gestureEnabled:   true,
           gestureDirection: 'horizontal',
@@ -306,23 +308,28 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)"
           options={{ headerShown: false }}/>
 
-        {/* ── Organisateur ── */}
-        <Stack.Screen name="(organizer)/dashboard"
-          options={{ animation: 'none' }}/>
+        {/* ── Organisateur — tab pages (no animation for instant feel) ── */}
+        <Stack.Screen name="(organizer)/dashboard"    options={{ animation: 'none' }}/>
+        <Stack.Screen name="(organizer)/events"       options={{ animation: 'none' }}/>
+        <Stack.Screen name="(organizer)/staff"        options={{ animation: 'none' }}/>
+        <Stack.Screen name="(organizer)/missions"     options={{ animation: 'none' }}/>
+        <Stack.Screen name="(organizer)/calendar"     options={{ animation: 'none' }}/>
+
+        {/* ── Organisateur — modals / push ── */}
         <Stack.Screen name="(organizer)/create-event"
-          options={{ animation: 'slide_from_bottom', gestureDirection: 'vertical' }}/>
+          options={{ animation: 'slide_from_bottom', gestureDirection: 'vertical', contentStyle: { backgroundColor: '#020A06' } }}/>
         <Stack.Screen name="(organizer)/event/[id]"
           options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom' }}/>
+        <Stack.Screen name="(organizer)/mission/[id]"
+          options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom' }}/>
         <Stack.Screen name="(organizer)/applications"
-          options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom' }}/>
-        <Stack.Screen name="(organizer)/missions"
-          options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom' }}/>
+          options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom', contentStyle: { backgroundColor: '#020A06' } }}/>
         <Stack.Screen name="(organizer)/profile"
-          options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom' }}/>
+          options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom', contentStyle: { backgroundColor: '#020A06' } }}/>
         <Stack.Screen name="(organizer)/edit-profile"
-          options={{ animation: 'slide_from_bottom', gestureDirection: 'vertical' }}/>
+          options={{ animation: 'slide_from_bottom', gestureDirection: 'vertical', contentStyle: { backgroundColor: '#020A06' } }}/>
         <Stack.Screen name="(organizer)/analytics"
-          options={{ animation: 'slide_from_bottom', gestureDirection: 'vertical' }}/>
+          options={{ animation: 'slide_from_bottom', gestureDirection: 'vertical', contentStyle: { backgroundColor: '#020A06' } }}/>
 
         {/* ── Staff ── */}
         <Stack.Screen name="(staff)/feed"
