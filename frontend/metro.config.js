@@ -6,6 +6,14 @@ const config = getDefaultConfig(__dirname, {
   isStandardEngine: true,
 });
 
+// Ensure 'web' is included in the platform list so that .web.ts / .web.js
+// stubs are resolved before their generic counterparts.
+// This is necessary for modules like expo-notifications that crash on web.
+config.resolver = {
+  ...config.resolver,
+  platforms: ['ios', 'android', 'web', 'native'],
+};
+
 // Sur Netlify, on évite le cache disque personnalisé qui peut causer des erreurs de module
 if (process.env.NETLIFY) {
   config.cacheStores = [];

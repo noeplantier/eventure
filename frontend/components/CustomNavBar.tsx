@@ -1,26 +1,27 @@
-/**
- * components/CustomNavBar.tsx — EVENTURE v3
- * 5-tab bottom navigation : Dashboard · Événements · Staffs · Missions · Calendrier
- * Active state détecté via usePathname()
- * Badge candidatures en attente sur l'onglet "Staffs"
- */
+
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Animated, Platform, StyleSheet, Text, TouchableOpacity, View,
+  Animated,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { BlurView }  from 'expo-blur';
-import { Ionicons }  from '@expo/vector-icons';
-import { supabase }  from '@/lib/supabase';
+import { BlurView } from 'expo-blur';
+import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '@/lib/supabase';
 
 let _useRouter: (() => { push: (p: any) => void }) | null = null;
 let _usePathname: (() => string) | null = null;
+
 try {
   const er = require('expo-router');
-  _useRouter   = er.useRouter;
+  _useRouter = er.useRouter;
   _usePathname = er.usePathname;
 } catch {}
 
-const PRIMARY  = '#6366F1';
+const PRIMARY = '#1A9FE3';
 const INACTIVE = '#9CA3AF';
 
 interface TabDef {
@@ -43,9 +44,9 @@ const TABS: TabDef[] = [
   },
   {
     key: 'events',
-    label: 'Événements',
-    icon: 'calendar-outline',
-    iconActive: 'calendar',
+    label: 'Profil',
+    icon: 'person-circle-outline',
+    iconActive: 'person-circle',
     route: '/(organizer)/events',
     match: ['/events', 'events'],
   },
@@ -75,44 +76,78 @@ const TABS: TabDef[] = [
   },
 ];
 
-/* ─── Tab Item ─────────────────────────────────────────────────────────────── */
 const TabItem = memo(function TabItem({
-  tab, active, badge, onPress,
-}: { tab: TabDef; active: boolean; badge?: number; onPress: () => void }) {
+  tab,
+  active,
+  badge,
+  onPress,
+}: {
+  tab: TabDef;
+  active: boolean;
+  badge?: number;
+  onPress: () => void;
+}) {
   const scale = useRef(new Animated.Value(1)).current;
 
-  const onPressIn = () =>
-    Animated.spring(scale, { toValue: 0.90, useNativeDriver: true, tension: 300, friction: 10 }).start();
-  const onPressOut = () =>
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 300, friction: 10 }).start();
+  const animatePress = () => {
+    Animated.sequence([
+      Animated.spring(scale, {
+        toValue: 0.92,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 8,
+      }),
+      Animated.spring(scale, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 8,
+      }),
+    ]).start();
+  };
 
   return (
     <TouchableOpacity
-      style={ns.tab}
-      onPress={() => { onPressIn(); setTimeout(() => { onPressOut(); onPress(); }, 60); }}
+      style={styles.tab}
       activeOpacity={1}
+      onPress={() => {
+        animatePress();
+        onPress();
+      }}
     >
-      <Animated.View style={[ns.tabInner, { transform: [{ scale }] }]}>
-        {/* Active indicator dot */}
-        {active && <View style={ns.activeDot}/>}
+      <Animated.View
+        style={[
+          styles.tabInner,
+          {
+            transform: [{ scale }],
+          },
+        ]}
+      >
+       
 
-        {/* Icon container */}
-        <View style={active ? ns.iconWrapActive : ns.iconWrap}>
+        <View style={active ? styles.iconWrapActive : styles.iconWrap}>
           <Ionicons
             name={active ? tab.iconActive : tab.icon}
-            size={22}
+            size={active ? 24 : 22}
             color={active ? PRIMARY : INACTIVE}
           />
-          {/* Badge */}
+
           {(badge ?? 0) > 0 && (
-            <View style={ns.badge}>
-              <Text style={ns.badgeTxt}>{(badge ?? 0) > 9 ? '9+' : badge}</Text>
+            <View style={styles.badge}>
+              <Text style={styles.badgeTxt}>
+                {(badge ?? 0) > 9 ? '9+' : badge}
+              </Text>
             </View>
           )}
         </View>
 
-        {/* Label */}
-        <Text style={[ns.label, active && ns.labelActive]} numberOfLines={1}>
+        <Text
+          style={[
+            styles.label,
+            active && styles.labelActive,
+          ]}
+          numberOfLines={1}
+        >
           {tab.label}
         </Text>
       </Animated.View>
@@ -120,177 +155,340 @@ const TabItem = memo(function TabItem({
   );
 });
 
-/* ─── Inner (needs hooks) ───────────────────────────────────────────────────── */
 function CustomNavBarInner() {
-  const router   = _useRouter!();
+  const router = _useRouter!();
   const pathname = _usePathname ? _usePathname() : '';
 
   const [pendingN, setPendingN] = useState(0);
-  const [uid, setUid]           = useState<string | null>(null);
+  const [uid, setUid] = useState<string | null>(null);
 
   const loadPending = useCallback(async (userId: string) => {
     try {
       const { data: evts } = await supabase
-        .from('events').select('id')
-        .eq('organizer_id', userId).eq('status', 'published');
-      if (!evts?.length) { setPendingN(0); return; }
-      const evtIds = evts.map((e: any) => e.id);
+        .from('events')
+        .select('id')
+        .eq('organizer_id', userId)
+        .eq('status', 'published');
+
+      if (!evts?.length) {
+        setPendingN(0);
+        return;
+      }
+
       const { data: roles } = await supabase
-        .from('event_roles').select('id').in('event_id', evtIds);
-      if (!roles?.length) { setPendingN(0); return; }
+        .from('event_roles')
+        .select('id')
+        .in(
+          'event_id',
+          evts.map((e: any) => e.id)
+        );
+
+      if (!roles?.length) {
+        setPendingN(0);
+        return;
+      }
+
       const { count } = await supabase
         .from('applications')
-        .select('id', { count: 'exact', head: true })
-        .in('event_role_id', roles.map((r: any) => r.id))
+        .select('id', {
+          count: 'exact',
+          head: true,
+        })
+        .in(
+          'event_role_id',
+          roles.map((r: any) => r.id)
+        )
         .eq('status', 'pending');
+
       setPendingN(count ?? 0);
     } catch {}
   }, []);
 
   useEffect(() => {
     let alive = true;
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!alive) return;
+
       const userId = session?.user?.id;
-      if (userId) { setUid(userId); loadPending(userId); }
+
+      if (userId) {
+        setUid(userId);
+        loadPending(userId);
+      }
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => {
-      const userId = s?.user?.id;
-      if (userId) { setUid(userId); loadPending(userId); }
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_, session) => {
+      const userId = session?.user?.id;
+
+      if (userId) {
+        setUid(userId);
+        loadPending(userId);
+      }
     });
-    return () => { alive = false; subscription.unsubscribe(); };
+
+    return () => {
+      alive = false;
+      subscription.unsubscribe();
+    };
   }, [loadPending]);
 
-  // Realtime: new applications
   useEffect(() => {
     if (!uid) return;
-    const ch = supabase
-      .channel(`navapp_${Date.now()}_${uid}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'applications' },
-        () => loadPending(uid))
+
+    const channel = supabase
+      .channel(`navbar_${uid}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'applications',
+        },
+        () => loadPending(uid)
+      )
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [uid, loadPending]);
 
-  const go = useCallback((path: string) => {
-    try { router.push(path as any); } catch {}
-  }, [router]);
+  const go = useCallback(
+    (route: string) => {
+      try {
+        router.push(route as any);
+      } catch {}
+    },
+    [router]
+  );
 
   const isActive = (tab: TabDef) =>
-    tab.match.some(m => pathname.includes(m));
+    tab.match.some((m) => pathname.includes(m));
 
   return (
-    <View style={ns.bar}>
-      <BlurView intensity={Platform.OS === 'ios' ? 60 : 25} tint="light" style={ns.blur}>
-        {TABS.map(tab => (
-          <TabItem
-            key={tab.key}
-            tab={tab}
-            active={isActive(tab)}
-            badge={tab.key === 'staff' ? pendingN : undefined}
-            onPress={() => go(tab.route)}
-          />
-        ))}
-      </BlurView>
+    <View pointerEvents="box-none" style={styles.wrapper}>
+      <View style={styles.bar}>
+        <View style={styles.glassOverlay} />
+
+        <BlurView
+          intensity={100}
+          tint="light"
+          style={styles.blur}
+        >
+          {TABS.map((tab) => (
+            <TabItem
+              key={tab.key}
+              tab={tab}
+              active={isActive(tab)}
+              badge={
+                tab.key === 'staff'
+                  ? pendingN
+                  : undefined
+              }
+              onPress={() => go(tab.route)}
+            />
+          ))}
+        </BlurView>
+      </View>
     </View>
   );
 }
 
-/* ─── Export — monté après 1 tick ─────────────────────────────────────────── */
 function CustomNavBar() {
   const [ready, setReady] = useState(false);
+
   useEffect(() => {
-    const t = setTimeout(() => setReady(true), 0);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => {
+      setReady(true);
+    }, 0);
+
+    return () => clearTimeout(timer);
   }, []);
+
   if (!ready || !_useRouter) return null;
-  return <CustomNavBarInner/>;
+
+  return <CustomNavBarInner />;
 }
 
 export default memo(CustomNavBar);
 
-/* ─── Styles ─────────────────────────────────────────────────────────────── */
-const ns = StyleSheet.create({
-  bar: {
-    position:     'absolute',
-    bottom:        0,
-    left:          0,
-    right:         0,
-    height:        Platform.OS === 'ios' ? 82 : 66,
-    overflow:     'hidden',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-  },
-  blur: {
-    flex:             1,
-    flexDirection:   'row',
-    justifyContent:  'space-around',
-    alignItems:      'flex-start',
-    paddingTop:       8,
-    paddingHorizontal: 4,
-    backgroundColor: 'rgba(255,255,255,0.92)',
-  },
-  tab: {
-    flex:    1,
+const styles = StyleSheet.create({
+  wrapper: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
+    pointerEvents: 'box-none',
   },
+
+  bar: {
+    position: 'absolute',
+
+    bottom: Platform.OS === 'ios' ? 26 : 18,
+
+    width: '92%',
+
+    height: 78,
+
+    borderRadius: 30,
+
+    overflow: 'hidden',
+
+    shadowColor: '#000',
+
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+
+    shadowOpacity: 0.18,
+
+    shadowRadius: 25,
+
+    elevation: 20,
+  },
+
+
+  blur: {
+    flex: 1,
+
+    flexDirection: 'row',
+
+    justifyContent: 'space-around',
+
+    alignItems: 'center',
+
+    borderRadius: 30,
+
+    overflow: 'hidden',
+
+    borderWidth: 1,
+
+    borderColor: 'rgba(255,255,255,0.18)',
+
+   
+
+    paddingHorizontal: 8,
+  },
+
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   tabInner: {
     alignItems: 'center',
-    gap:         2,
-    paddingTop:  2,
+    justifyContent: 'center',
   },
+
   activeDot: {
-    position:       'absolute',
-    top:            -8,
-    width:           24,
-    height:          3,
-    borderRadius:    2,
+    position: 'absolute',
+
+    top: -12,
+
+    width: 30,
+
+    height: 4,
+
+    borderRadius: 30,
+
     backgroundColor: PRIMARY,
+
+    shadowColor: PRIMARY,
+
+    shadowOpacity: 0.8,
+
+    shadowRadius: 12,
   },
+
   iconWrap: {
-    width:          40,
-    height:         36,
-    alignItems:    'center',
-    justifyContent:'center',
-    borderRadius:  10,
-    position:      'relative',
+    width: 42,
+    height: 42,
+
+    borderRadius: 21,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    position: 'relative',
   },
+
   iconWrapActive: {
-    width:          40,
-    height:         36,
-    alignItems:    'center',
-    justifyContent:'center',
-    borderRadius:  10,
-    backgroundColor: 'rgba(99,102,241,0.10)',
-    position:      'relative',
+    width: 50,
+    height: 50,
+
+    borderRadius: 25,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    position: 'relative',
+
+    backgroundColor: 'rgba(26,159,227,0.18)',
+
+    borderWidth: 1,
+
+    borderColor: 'rgba(26,159,227,0.35)',
+
+    shadowColor: PRIMARY,
+
+    shadowOpacity: 0.35,
+
+    shadowRadius: 15,
+
+    elevation: 8,
   },
+
   label: {
-    fontSize:      10,
-    fontWeight:   '500',
-    color:         INACTIVE,
-    letterSpacing: 0.1,
+    marginTop: 3,
+
+    fontSize: 10,
+
+    fontWeight: '600',
+
+    color: INACTIVE,
+
+    letterSpacing: 0.3,
   },
+
   labelActive: {
-    color:      PRIMARY,
-    fontWeight:'700',
-  },
-  badge: {
-    position:        'absolute',
-    top:              0,
-    right:            0,
-    minWidth:         15,
-    height:           15,
-    borderRadius:     8,
-    backgroundColor: '#EF4444',
-    alignItems:      'center',
-    justifyContent:  'center',
-    paddingHorizontal: 3,
-    borderWidth:      1.5,
-    borderColor:      '#FFFFFF',
-  },
-  badgeTxt: {
-    color:      '#FFFFFF',
-    fontSize:    8,
+    color: PRIMARY,
     fontWeight: '800',
+  },
+
+  badge: {
+    position: 'absolute',
+
+    top: -2,
+    right: -4,
+
+    minWidth: 18,
+    height: 18,
+
+    borderRadius: 20,
+
+    backgroundColor: '#EF4444',
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    paddingHorizontal: 4,
+
+    borderWidth: 2,
+
+    borderColor: 'rgba(255,255,255,0.95)',
+  },
+
+  badgeTxt: {
+    color: '#FFFFFF',
+
+    fontSize: 9,
+
+    fontWeight: '900',
   },
 });

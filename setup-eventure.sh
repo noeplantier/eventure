@@ -775,7 +775,7 @@ export default function Dashboard() {
       <SafeAreaView edges={['top']}>
         <View style={s.nav}>
           <View>
-            <Text style={s.greeting}>Bonjour 👋</Text>
+            <Text style={s.greeting}>Bonjour </Text>
             <Text style={s.name}>{user?.display_name ?? '…'}</Text>
           </View>
           <TouchableOpacity style={s.createBtn} onPress={()=>router.push('/(organizer)/create-event' as any)} activeOpacity={0.82}>

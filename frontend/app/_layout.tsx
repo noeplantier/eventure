@@ -1,12 +1,10 @@
 /**
- * app/_layout.tsx — EVENTURE · ROOT LAYOUT
+ * app/_layout.tsx — EVENTURE v3 · ROOT LAYOUT
  *
- * ★ Architecture IDENTIQUE Universe v9
- * ★ Overlay anti-screenshot RETIRÉ du web ici
- *   → géré exclusivement par la couche app.json / service worker
- * ★ Natif uniquement : FLAG_SECURE Android + détection iOS
- * ★ NavBar toujours visible (pas de /reels dans Eventure → pas d'animation)
- * ★ Zéro typeof/document/window au module-level → pas de SyntaxError SSR
+ * ★ ThemeProvider  : jour/nuit persisté dans AsyncStorage
+ * ★ QueryClient   : @tanstack/react-query global cache
+ * ★ Notifications : expo-notifications (permission + token on mount)
+ * ★ Overlay anti-screenshot : natif uniquement (FLAG_SECURE Android)
  */
 import React, {
   useCallback, useEffect, useRef, useState,
@@ -28,8 +26,22 @@ import * as SplashScreen     from 'expo-splash-screen';
 import { Ionicons }          from '@expo/vector-icons';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient }    from 'expo-linear-gradient';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { supabase }          from '@/lib/supabase';
-import CustomNavBar          from '../components/CustomNavBar';
+import { ThemeProvider, useTheme } from '../context/ThemeContext';
+import { setupNotifications }     from '../lib/notifications';
+import { getWorkingUid, getWorkingOrganizerId } from '../lib/mockUser';
+import CustomNavBar               from '../components/CustomNavBar';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime   : 30_000,  // 30s
+      retry       : 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -273,17 +285,28 @@ function NavBarWrapper() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RootLayout — identique Universe v9 sans ReelsUIProvider
+// ThemedApp — inner root that can use ThemeContext (must be inside ThemeProvider)
 // ─────────────────────────────────────────────────────────────────────────────
-export default function RootLayout() {
-  const [ready, setReady] = useState(false);
-  const screenshotVisible = useAntiScreenshot();
-
+function ThemedApp() {
+  const { colors, isDark }   = useTheme();
+  const [ready, setReady]    = useState(false);
+  const screenshotVisible    = useAntiScreenshot();
 
   useEffect(() => {
-    supabase.auth.getSession()
-      .then(() => { setReady(true); SplashScreen.hideAsync().catch(() => {}); })
-      .catch(() => { setReady(true); SplashScreen.hideAsync().catch(() => {}); });
+    const init = async () => {
+      try {
+        await supabase.auth.getSession();
+        // Crée l'organisateur demo + lance le seed (await = row dispo avant les pages)
+        const uid = await getWorkingUid();
+        await getWorkingOrganizerId().catch(() => {});
+        if (Platform.OS !== 'web') {
+          setupNotifications(uid).catch(() => {});
+        }
+      } catch {}
+      setReady(true);
+      SplashScreen.hideAsync().catch(() => {});
+    };
+    init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {});
     return () => subscription.unsubscribe();
@@ -293,7 +316,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="dark"/>
+      <StatusBar style={isDark ? 'light' : 'dark'}/>
 
       <Stack
         screenOptions={{
@@ -317,19 +340,19 @@ export default function RootLayout() {
 
         {/* ── Organisateur — modals / push ── */}
         <Stack.Screen name="(organizer)/create-event"
-          options={{ animation: 'slide_from_bottom', gestureDirection: 'vertical', contentStyle: { backgroundColor: '#020A06' } }}/>
+          options={{ animation: 'slide_from_bottom', gestureDirection: 'vertical' }}/>
         <Stack.Screen name="(organizer)/event/[id]"
           options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom' }}/>
         <Stack.Screen name="(organizer)/mission/[id]"
           options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom' }}/>
         <Stack.Screen name="(organizer)/applications"
-          options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom', contentStyle: { backgroundColor: '#020A06' } }}/>
+          options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom' }}/>
         <Stack.Screen name="(organizer)/profile"
-          options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom', contentStyle: { backgroundColor: '#020A06' } }}/>
+          options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom' }}/>
         <Stack.Screen name="(organizer)/edit-profile"
-          options={{ animation: 'slide_from_bottom', gestureDirection: 'vertical', contentStyle: { backgroundColor: '#020A06' } }}/>
+          options={{ animation: 'slide_from_bottom', gestureDirection: 'vertical' }}/>
         <Stack.Screen name="(organizer)/analytics"
-          options={{ animation: 'slide_from_bottom', gestureDirection: 'vertical', contentStyle: { backgroundColor: '#020A06' } }}/>
+          options={{ animation: 'slide_from_bottom', gestureDirection: 'vertical' }}/>
 
         {/* ── Staff ── */}
         <Stack.Screen name="(staff)/feed"
@@ -357,6 +380,19 @@ export default function RootLayout() {
       <ScreenshotOverlay visible={screenshotVisible}/>
 
     </SafeAreaProvider>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RootLayout — wraps everything in ThemeProvider + QueryClientProvider
+// ─────────────────────────────────────────────────────────────────────────────
+export default function RootLayout() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <ThemedApp />
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
 

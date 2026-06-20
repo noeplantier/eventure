@@ -1,97 +1,112 @@
 /**
- * app/(organizer)/calendar.tsx — EVENTURE v3
- * Planning multi-événements : vue mois personnalisée
+ * app/(organizer)/calendar.tsx — EVENTURE v3 · Dark Green
+ *
+ * Palette : #020A06 bg · #00D97E primary · #F5C842 gold
  */
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated, Dimensions, Easing, Modal, ScrollView,
   StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
-import { Ionicons }     from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter }    from 'expo-router';
-import { supabase }     from '@/lib/supabase';
+import { LinearGradient }  from 'expo-linear-gradient';
+import { Ionicons }        from '@expo/vector-icons';
+import { SafeAreaView }    from 'react-native-safe-area-context';
+import { useRouter }       from 'expo-router';
+import { supabase }        from '@/lib/supabase';
+import { getWorkingUid }   from '@/lib/mockUser';
 
-/* ─── Design tokens ─────────────────────────────────────────────────────── */
+/* ─── Palette — Dark Green ───────────────────────────────────────────────── */
 const { width: SW } = Dimensions.get('window');
-const BG      = '#F8FAFC';
-const PRIMARY = '#6366F1';
-const P_LIGHT = '#EEF2FF';
-const P_GHOST = 'rgba(99,102,241,0.08)';
+const BG    = '#050E1B';
+const BLUE = '#1A9FE3';
+const GOLD  = '#F5C842';
+const EDGE  = 16;
+
+const T = {
+  white   : '#FFFFFF',
+  offWhite: 'rgba(255,255,255,0.88)',
+  muted   : 'rgba(255,255,255,0.50)',
+  faint   : 'rgba(255,255,255,0.18)',
+  surf    : 'rgba(255,255,255,0.045)',
+  surfHi  : 'rgba(255,255,255,0.09)',
+  border  : 'rgba(26,159,227,0.12)',
+  borderHi: 'rgba(26,159,227,0.30)',
+  navy    : '#0C1A30',
+  amber   : '#F59E0B',
+  red     : '#EF4444',
+  green   : '#10B981',
+  blue    : '#3B82F6',
+  purple  : '#A78BFA',
+} as const;
+
 const SUCCESS = '#10B981';
 const WARNING = '#F59E0B';
 const DANGER  = '#EF4444';
-const PURPLE  = '#8B5CF6';
-const BLUE    = '#3B82F6';
-const EDGE    = 16;
+const PURPLE  = '#A78BFA';
 
-const C = {
-  text:      '#111827',
-  textSub:   '#6B7280',
-  textMuted: '#9CA3AF',
-  border:    '#E5E7EB',
-  surface:   '#FFFFFF',
-  surfaceAlt:'#F1F5F9',
-} as const;
-
-/* ─── Types ──────────────────────────────────────────────────────────────── */
-interface CalEvent {
-  id:         string;
-  title:      string;
-  date_start: string;
-  date_end:   string | null;
-  location:   string;
-  status:     string;
-  type:       string | null;
-}
-
-/* ─── Helpers ────────────────────────────────────────────────────────────── */
 const TYPE_COLORS: Record<string, string> = {
   Festival: SUCCESS, Gala: WARNING, Conférence: BLUE,
   Mariage: '#EC4899', Séminaire: PURPLE, Concert: DANGER, Sport: SUCCESS,
 };
-const typeColor = (t: string | null) => TYPE_COLORS[t ?? ''] ?? PRIMARY;
+const typeColor = (t: string | null) => TYPE_COLORS[t ?? ''] ?? BLUE;
 
 const MONTHS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 const DAYS   = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
-
 const isSameDay = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
-const ymd = (d: Date) => d.toISOString().slice(0, 10);
+/* ─── Particle Background ─────────────────────────────────────────────── */
+const PCOLS = [BLUE,'rgba(26,159,227,0.4)',GOLD,'rgba(245,200,66,0.32)','rgba(255,255,255,0.16)'];
+const PTS   = Array.from({length:18},(_,i)=>({
+  id:i, x:((Math.sin(i*2.399)+1)/2)*SW, y:((Math.cos(i*1.618)+1)/2)*900,
+  sz:0.8+(i%8)*0.2, col:PCOLS[i%PCOLS.length], op:0.04+(i%6)*0.03,
+}));
+
+const ParticleBg = memo(() => (
+  <View style={StyleSheet.absoluteFill} pointerEvents="none">
+    <LinearGradient colors={[BG,'#091628',BG]} style={StyleSheet.absoluteFill}/>
+    <View style={{position:'absolute',top:'6%',left:'12%',width:SW*.7,height:SW*.7,borderRadius:SW*.35,backgroundColor:'rgba(26,159,227,0.025)'}}/>
+    <View style={{position:'absolute',bottom:'8%',right:'-18%',width:SW*.6,height:SW*.6,borderRadius:SW*.3,backgroundColor:'rgba(56,189,248,0.02)'}}/>
+    {PTS.map(p=><View key={p.id} style={{position:'absolute',left:p.x,top:p.y,width:p.sz,height:p.sz,borderRadius:p.sz/2,backgroundColor:p.col,opacity:p.op}}/>)}
+  </View>
+));
+
+/* ─── Types ──────────────────────────────────────────────────────────────── */
+interface CalEvent {
+  id: string; title: string; date_start: string; date_end: string | null;
+  location: string; status: string; type: string | null;
+}
 
 /* ─── Day Cell ───────────────────────────────────────────────────────────── */
-const DayCell = memo(function DayCell({
-  date, isCurrentMonth, isToday, events, onPress,
-}: {
-  date: Date; isCurrentMonth: boolean; isToday: boolean;
-  events: CalEvent[]; onPress: () => void;
+const DayCell = memo(function DayCell({ date, isCurrentMonth, isToday, events, onPress }: {
+  date: Date; isCurrentMonth: boolean; isToday: boolean; events: CalEvent[]; onPress: () => void;
 }) {
-  const CELL = Math.floor((SW - EDGE * 2 - 12) / 7);
+  const CELL      = Math.floor((SW - EDGE * 2 - 12) / 7);
   const hasEvents = events.length > 0;
-  const dots = events.slice(0, 3).map(e => typeColor(e.type));
+  const dots      = events.slice(0, 3).map(e => typeColor(e.type));
 
   return (
     <TouchableOpacity
       style={[
         { width: CELL, height: CELL + 8, alignItems: 'center', paddingTop: 6, borderRadius: 10 },
-        isToday && { backgroundColor: PRIMARY },
+        isToday && { backgroundColor: BLUE },
         !isCurrentMonth && { opacity: 0.3 },
-        hasEvents && !isToday && { backgroundColor: P_GHOST },
+        hasEvents && !isToday && { backgroundColor: 'rgba(26,159,227,0.12)', borderWidth: StyleSheet.hairlineWidth, borderColor: T.border },
       ]}
       onPress={onPress}
       activeOpacity={hasEvents ? 0.7 : 1}
     >
-      <Text style={[
-        { fontSize: 14, fontWeight: isToday ? '800' : hasEvents ? '700' : '400',
-          color: isToday ? '#FFF' : isCurrentMonth ? C.text : C.textMuted },
-      ]}>
+      <Text style={{
+        fontSize: 14,
+        fontWeight: isToday ? '800' : hasEvents ? '700' : '400',
+        color: isToday ? '#000' : isCurrentMonth ? T.white : T.muted,
+      }}>
         {date.getDate()}
       </Text>
       {hasEvents && (
         <View style={{ flexDirection: 'row', gap: 2, marginTop: 3 }}>
           {dots.map((c, i) => (
-            <View key={i} style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: isToday ? 'rgba(255,255,255,0.8)' : c }}/>
+            <View key={i} style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: isToday ? 'rgba(0,0,0,0.6)' : c }}/>
           ))}
         </View>
       )}
@@ -100,9 +115,7 @@ const DayCell = memo(function DayCell({
 });
 
 /* ─── Day Modal ──────────────────────────────────────────────────────────── */
-const DayModal = memo(function DayModal({
-  visible, date, events, onClose, onCreateEvent,
-}: {
+const DayModal = memo(function DayModal({ visible, date, events, onClose, onCreateEvent }: {
   visible: boolean; date: Date; events: CalEvent[]; onClose: () => void; onCreateEvent: () => void;
 }) {
   const slideAnim = useRef(new Animated.Value(300)).current;
@@ -126,38 +139,43 @@ const DayModal = memo(function DayModal({
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      <Animated.View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end', opacity: bgAnim }}>
+      <Animated.View style={{ flex: 1, backgroundColor: 'rgba(2,10,6,0.82)', justifyContent: 'flex-end', opacity: bgAnim }}>
         <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} activeOpacity={1}/>
         <Animated.View style={[dm.sheet, { transform: [{ translateY: slideAnim }] }]}>
+          <LinearGradient colors={['#0C1A30', BG]} style={StyleSheet.absoluteFillObject}/>
 
-          {/* Handle */}
-          <View style={dm.handle}/>
+          <View style={[dm.handle, { backgroundColor: T.faint }]}/>
 
-          {/* Header */}
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <Text style={dm.dateTitle}>{dayLabel}</Text>
-            <TouchableOpacity onPress={onClose} style={dm.closeBtn} activeOpacity={0.7}>
-              <Ionicons name="close" size={20} color={C.textMuted}/>
+            <Text style={[dm.dateTitle, { color: T.white }]}>{dayLabel}</Text>
+            <TouchableOpacity onPress={onClose}
+              style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
+                backgroundColor: T.surf, borderWidth: StyleSheet.hairlineWidth, borderColor: T.border }}
+              activeOpacity={0.7}>
+              <Ionicons name="close" size={20} color={T.muted}/>
             </TouchableOpacity>
           </View>
 
           {events.length > 0 ? (
             <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 320 }}>
-              <Text style={dm.sectionLabel}>{events.length} événement{events.length > 1 ? 's' : ''}</Text>
+              <Text style={[dm.sectionLabel, { color: T.muted }]}>{events.length} événement{events.length > 1 ? 's' : ''}</Text>
               <View style={{ gap: 8 }}>
                 {events.map(ev => {
                   const tc = typeColor(ev.type);
                   return (
-                    <View key={ev.id} style={[dm.evtRow, { borderLeftColor: tc }]}>
+                    <View key={ev.id} style={[dm.evtRow, { backgroundColor: T.surf, borderLeftColor: tc,
+                      borderWidth: StyleSheet.hairlineWidth, borderColor: T.border }]}>
                       <View style={{ flex: 1, gap: 3 }}>
-                        <Text style={dm.evtTitle} numberOfLines={1}>{ev.title}</Text>
-                        <Text style={dm.evtMeta} numberOfLines={1}>{ev.location}</Text>
-                        {ev.type && <Text style={[dm.evtType, { color: tc }]}>{ev.type}</Text>}
+                        <Text style={[dm.evtTitle, { color: T.white }]} numberOfLines={1}>{ev.title}</Text>
+                        <Text style={[dm.evtMeta, { color: T.offWhite }]} numberOfLines={1}>{ev.location}</Text>
+                        {!!ev.type && <Text style={[dm.evtType, { color: tc }]}>{ev.type}</Text>}
                       </View>
                       <View style={{ paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6,
-                                     backgroundColor: ev.status === 'published' ? 'rgba(16,185,129,0.10)' : C.surfaceAlt }}>
+                        backgroundColor: ev.status === 'published' ? 'rgba(26,159,227,0.12)' : T.surf,
+                        borderWidth: StyleSheet.hairlineWidth,
+                        borderColor: ev.status === 'published' ? T.borderHi : T.border }}>
                         <Text style={{ fontSize: 10, fontWeight: '700',
-                                       color: ev.status === 'published' ? SUCCESS : C.textMuted }}>
+                          color: ev.status === 'published' ? BLUE : T.muted }}>
                           {ev.status === 'published' ? 'Actif' : ev.status === 'draft' ? 'Brouillon' : 'Terminé'}
                         </Text>
                       </View>
@@ -168,41 +186,44 @@ const DayModal = memo(function DayModal({
             </ScrollView>
           ) : (
             <View style={{ alignItems: 'center', paddingVertical: 32, gap: 12 }}>
-              <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: P_LIGHT, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="calendar-outline" size={26} color={PRIMARY}/>
+              <View style={{ width: 56, height: 56, borderRadius: 28,
+                backgroundColor: 'rgba(26,159,227,0.10)', alignItems: 'center', justifyContent: 'center',
+                borderWidth: 1, borderColor: T.borderHi }}>
+                <Ionicons name="calendar-outline" size={26} color={BLUE}/>
               </View>
-              <Text style={{ fontSize: 15, fontWeight: '600', color: C.text }}>Aucun événement</Text>
-              <Text style={{ color: C.textSub, fontSize: 12, textAlign: 'center' }}>Ce jour est libre.</Text>
+              <Text style={{ fontSize: 15, fontWeight: '600', color: T.white }}>Aucun événement</Text>
+              <Text style={{ color: T.offWhite, fontSize: 12, textAlign: 'center' }}>Ce jour est libre.</Text>
             </View>
           )}
 
           <TouchableOpacity style={dm.createBtn} onPress={onCreateEvent} activeOpacity={0.85}>
-            <Ionicons name="add" size={18} color="#FFF"/>
+            <LinearGradient colors={['rgba(26,159,227,0.30)','rgba(26,159,227,0.14)']} style={StyleSheet.absoluteFillObject}/>
+            <View pointerEvents="none" style={{position:'absolute',top:0,left:0,right:0,bottom:0,borderRadius:14,borderWidth:1,borderColor:T.borderHi}}/>
+            <Ionicons name="add" size={18} color={BLUE}/>
             <Text style={dm.createTxt}>Créer un événement ce jour</Text>
           </TouchableOpacity>
 
+          <View pointerEvents="none" style={{position:'absolute',top:0,left:0,right:0,bottom:0,
+            borderTopLeftRadius:24,borderTopRightRadius:24,
+            borderWidth:StyleSheet.hairlineWidth,borderColor:T.border}}/>
         </Animated.View>
       </Animated.View>
     </Modal>
   );
 });
 const dm = StyleSheet.create({
-  sheet:       { backgroundColor: C.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24,
-                 padding: 20, paddingTop: 12,
-                 shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 20 },
-  handle:      { width: 40, height: 4, borderRadius: 2, backgroundColor: C.border, alignSelf: 'center', marginBottom: 16 },
-  dateTitle:   { fontSize: 17, fontWeight: '800', color: C.text, textTransform: 'capitalize' },
-  closeBtn:    { width: 32, height: 32, borderRadius: 16, backgroundColor: C.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
-  sectionLabel:{ fontSize: 12, fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
-  evtRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surfaceAlt,
-                 borderRadius: 10, padding: 12, borderLeftWidth: 3 },
-  evtTitle:    { fontSize: 14, fontWeight: '700', color: C.text },
-  evtMeta:     { fontSize: 12, color: C.textSub },
-  evtType:     { fontSize: 11, fontWeight: '600' },
-  createBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-                 backgroundColor: PRIMARY, borderRadius: 12, paddingVertical: 14, marginTop: 16,
-                 shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6 },
-  createTxt:   { color: '#FFF', fontWeight: '800', fontSize: 15 },
+  sheet      : { borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden',
+    padding: 20, paddingTop: 12, backgroundColor: T.navy },
+  handle     : { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  dateTitle  : { fontSize: 17, fontWeight: '800', textTransform: 'capitalize' },
+  sectionLabel:{ fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  evtRow     : { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 10, padding: 12, borderLeftWidth: 3 },
+  evtTitle   : { fontSize: 14, fontWeight: '700' },
+  evtMeta    : { fontSize: 12 },
+  evtType    : { fontSize: 11, fontWeight: '600' },
+  createBtn  : { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    borderRadius: 14, paddingVertical: 14, marginTop: 16, overflow: 'hidden', backgroundColor: T.navy },
+  createTxt  : { color: BLUE, fontWeight: '800', fontSize: 15 },
 });
 
 /* ─── Month Legend ───────────────────────────────────────────────────────── */
@@ -212,9 +233,11 @@ const MonthLegend = memo(({ events }: { events: CalEvent[] }) => {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 2 }}>
       {types.map(t => (
-        <View key={t} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border }}>
+        <View key={t} style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
+          paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20,
+          backgroundColor: T.surf, borderWidth: 1, borderColor: T.border }}>
           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: typeColor(t) }}/>
-          <Text style={{ fontSize: 11, color: C.textSub, fontWeight: '600' }}>{t}</Text>
+          <Text style={{ fontSize: 11, color: T.offWhite, fontWeight: '600' }}>{t}</Text>
         </View>
       ))}
     </ScrollView>
@@ -225,18 +248,17 @@ const MonthLegend = memo(({ events }: { events: CalEvent[] }) => {
 export default function CalendarScreen() {
   const router = useRouter();
 
-  const [events,     setEvents]     = useState<CalEvent[]>([]);
-  const [loading,    setLoading]    = useState(true);
-  const [year,       setYear]       = useState(new Date().getFullYear());
-  const [month,      setMonth]      = useState(new Date().getMonth());
-  const [selectedDay,setSelectedDay]= useState<Date | null>(null);
-  const [modalVisible,setModalVisible]=useState(false);
+  const [events,       setEvents]       = useState<CalEvent[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [year,         setYear]         = useState(new Date().getFullYear());
+  const [month,        setMonth]        = useState(new Date().getMonth());
+  const [selectedDay,  setSelectedDay]  = useState<Date | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const uid = session.user.id;
+      const uid = await getWorkingUid();
+      if (!uid) return;
       const { data } = await supabase
         .from('events')
         .select('id,title,date_start,date_end,location,status,type')
@@ -249,26 +271,14 @@ export default function CalendarScreen() {
 
   useEffect(() => { load(); }, []);
 
-  // Build calendar grid
   const calendarDays = useMemo(() => {
-    const first = new Date(year, month, 1);
-    const last  = new Date(year, month + 1, 0);
-    // Start from Monday
+    const first    = new Date(year, month, 1);
+    const last     = new Date(year, month + 1, 0);
     const startDay = (first.getDay() + 6) % 7;
     const days: Date[] = [];
-    // Previous month fill
-    for (let i = startDay - 1; i >= 0; i--) {
-      const d = new Date(year, month, -i);
-      days.push(d);
-    }
-    // Current month
-    for (let i = 1; i <= last.getDate(); i++) {
-      days.push(new Date(year, month, i));
-    }
-    // Next month fill (to make complete weeks)
-    while (days.length % 7 !== 0) {
-      days.push(new Date(year, month + 1, days.length - last.getDate() - startDay + 1));
-    }
+    for (let i = startDay - 1; i >= 0; i--) days.push(new Date(year, month, -i));
+    for (let i = 1; i <= last.getDate(); i++) days.push(new Date(year, month, i));
+    while (days.length % 7 !== 0) days.push(new Date(year, month + 1, days.length - last.getDate() - startDay + 1));
     return days;
   }, [year, month]);
 
@@ -276,27 +286,19 @@ export default function CalendarScreen() {
     events.filter(ev => {
       const evDate = new Date(ev.date_start);
       if (isSameDay(evDate, date)) return true;
-      if (ev.date_end) {
-        const endDate = new Date(ev.date_end);
-        return date >= evDate && date <= endDate;
-      }
+      if (ev.date_end) { const endDate = new Date(ev.date_end); return date >= evDate && date <= endDate; }
       return false;
     }), [events]);
 
-  const today   = new Date();
+  const today     = new Date();
   const prevMonth = () => { if (month === 0) { setYear(y => y - 1); setMonth(11); } else setMonth(m => m - 1); };
-  const nextMonth = () => { if (month === 11) { setYear(y => y + 1); setMonth(0);  } else setMonth(m => m + 1); };
+  const nextMonth = () => { if (month === 11) { setYear(y => y + 1); setMonth(0); } else setMonth(m => m + 1); };
 
   const monthEvents = useMemo(() =>
-    events.filter(ev => {
-      const d = new Date(ev.date_start);
-      return d.getFullYear() === year && d.getMonth() === month;
-    }), [events, year, month]);
+    events.filter(ev => { const d = new Date(ev.date_start); return d.getFullYear() === year && d.getMonth() === month; }),
+    [events, year, month]);
 
-  const openDay = (date: Date) => {
-    setSelectedDay(date);
-    setModalVisible(true);
-  };
+  const openDay = (date: Date) => { setSelectedDay(date); setModalVisible(true); };
 
   const headerAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -306,48 +308,55 @@ export default function CalendarScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: BG }}>
+      <ParticleBg />
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
 
         {/* ── HEADER ── */}
         <View style={{ paddingHorizontal: EDGE, paddingTop: 12, paddingBottom: 8, gap: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ fontSize: 22, fontWeight: '800', color: C.text }}>Calendrier</Text>
+            <Text style={{ fontSize: 22, fontWeight: '800', color: T.white }}>Calendrier</Text>
             <TouchableOpacity
-              style={{ backgroundColor: PRIMARY, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12,
-                       shadowColor: PRIMARY, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
+                paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, overflow: 'hidden',
+                backgroundColor: T.navy, borderWidth: 1, borderColor: T.borderHi }}
               onPress={() => router.push('/(organizer)/create-event' as any)}
               activeOpacity={0.82}
             >
-              <Ionicons name="add" size={16} color="#FFF"/>
-              <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Créer</Text>
+              <LinearGradient colors={['rgba(26,159,227,0.25)','rgba(26,159,227,0.10)']} style={StyleSheet.absoluteFillObject}/>
+              <Ionicons name="add" size={16} color={BLUE}/>
+              <Text style={{ color: BLUE, fontWeight: '700', fontSize: 13 }}>Créer</Text>
             </TouchableOpacity>
           </View>
 
           {/* Month navigation */}
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <TouchableOpacity
-              style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.border }}
+              style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: T.surf,
+                alignItems: 'center', justifyContent: 'center',
+                borderWidth: 1, borderColor: T.border }}
               onPress={prevMonth} activeOpacity={0.7}
             >
-              <Ionicons name="chevron-back" size={18} color={C.text}/>
+              <Ionicons name="chevron-back" size={18} color={T.white}/>
             </TouchableOpacity>
 
             <Animated.View style={{ opacity: headerAnim, transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}>
               <TouchableOpacity onPress={() => { setYear(new Date().getFullYear()); setMonth(new Date().getMonth()); }} activeOpacity={0.7}>
-                <Text style={{ fontSize: 18, fontWeight: '800', color: C.text, textAlign: 'center' }}>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: T.white, textAlign: 'center' }}>
                   {MONTHS[month]} {year}
                 </Text>
-                <Text style={{ fontSize: 11, color: C.textSub, textAlign: 'center', marginTop: 2 }}>
+                <Text style={{ fontSize: 11, color: BLUE, textAlign: 'center', marginTop: 2, fontWeight: '600' }}>
                   {monthEvents.length} événement{monthEvents.length !== 1 ? 's' : ''}
                 </Text>
               </TouchableOpacity>
             </Animated.View>
 
             <TouchableOpacity
-              style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.border }}
+              style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: T.surf,
+                alignItems: 'center', justifyContent: 'center',
+                borderWidth: 1, borderColor: T.border }}
               onPress={nextMonth} activeOpacity={0.7}
             >
-              <Ionicons name="chevron-forward" size={18} color={C.text}/>
+              <Ionicons name="chevron-forward" size={18} color={T.white}/>
             </TouchableOpacity>
           </View>
         </View>
@@ -355,36 +364,31 @@ export default function CalendarScreen() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: EDGE, paddingBottom: 120, gap: 16 }}>
 
           {/* ── CALENDAR GRID ── */}
-          <View style={cal.grid}>
-            {/* Day headers */}
+          <View style={[cal.grid, { backgroundColor: T.navy, borderColor: T.border }]}>
+            <LinearGradient colors={[`${BLUE}08`,`${BLUE}02`]} style={StyleSheet.absoluteFillObject}/>
             <View style={{ flexDirection: 'row', marginBottom: 4 }}>
               {DAYS.map((d, i) => (
                 <View key={i} style={{ flex: 1, alignItems: 'center', paddingVertical: 8 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: i >= 5 ? PRIMARY : C.textMuted }}>{d}</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: i >= 5 ? BLUE : T.muted }}>{d}</Text>
                 </View>
               ))}
             </View>
-
-            {/* Days grid */}
             {Array.from({ length: calendarDays.length / 7 }, (_, weekIdx) => (
               <View key={weekIdx} style={{ flexDirection: 'row', gap: 2, marginBottom: 2 }}>
-                {calendarDays.slice(weekIdx * 7, weekIdx * 7 + 7).map((date, dayIdx) => {
-                  const isCurrentMonth = date.getMonth() === month;
-                  const isToday = isSameDay(date, today);
-                  const dayEvts = eventsOnDay(date);
-                  return (
-                    <DayCell
-                      key={dayIdx}
-                      date={date}
-                      isCurrentMonth={isCurrentMonth}
-                      isToday={isToday}
-                      events={dayEvts}
-                      onPress={() => openDay(date)}
-                    />
-                  );
-                })}
+                {calendarDays.slice(weekIdx * 7, weekIdx * 7 + 7).map((date, dayIdx) => (
+                  <DayCell
+                    key={dayIdx}
+                    date={date}
+                    isCurrentMonth={date.getMonth() === month}
+                    isToday={isSameDay(date, today)}
+                    events={eventsOnDay(date)}
+                    onPress={() => openDay(date)}
+                  />
+                ))}
               </View>
             ))}
+            <View pointerEvents="none" style={{position:'absolute',top:0,left:0,right:0,bottom:0,
+              borderRadius:16,borderWidth:StyleSheet.hairlineWidth,borderColor:T.border}}/>
           </View>
 
           {/* ── LEGEND ── */}
@@ -393,8 +397,8 @@ export default function CalendarScreen() {
           {/* ── THIS MONTH'S EVENTS ── */}
           {monthEvents.length > 0 && (
             <View style={{ gap: 8 }}>
-              <Text style={{ fontSize: 14, fontWeight: '800', color: C.text }}>
-                Ce mois · {monthEvents.length} événement{monthEvents.length !== 1 ? 's' : ''}
+              <Text style={{ fontSize: 14, fontWeight: '800', color: T.white }}>
+                Ce mois · <Text style={{ color: BLUE }}>{monthEvents.length}</Text> événement{monthEvents.length !== 1 ? 's' : ''}
               </Text>
               {monthEvents.map(ev => {
                 const tc   = typeColor(ev.type);
@@ -403,30 +407,35 @@ export default function CalendarScreen() {
                 return (
                   <TouchableOpacity
                     key={ev.id}
-                    style={[cal.evtCard, { borderLeftColor: tc }]}
+                    style={[cal.evtCard, { backgroundColor: T.navy, borderColor: T.border, borderLeftColor: tc }]}
                     onPress={() => router.push({ pathname: '/(organizer)/event/[id]', params: { id: ev.id } } as any)}
                     activeOpacity={0.82}
                   >
+                    <LinearGradient colors={[`${tc}0A`,`${tc}03`]} style={StyleSheet.absoluteFillObject}/>
                     <View style={{ flex: 1, gap: 3 }}>
-                      <Text style={cal.evtTitle} numberOfLines={1}>{ev.title}</Text>
-                      <Text style={cal.evtDate}>
+                      <Text style={[cal.evtTitle, { color: T.white }]} numberOfLines={1}>{ev.title}</Text>
+                      <Text style={[cal.evtDate, { color: T.offWhite }]}>
                         {new Date(ev.date_start).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
                         {ev.date_end ? ` → ${new Date(ev.date_end).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''}
                       </Text>
-                      <Text style={cal.evtLoc} numberOfLines={1}>{ev.location}</Text>
+                      <Text style={[cal.evtLoc, { color: T.muted }]} numberOfLines={1}>{ev.location}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end', gap: 6 }}>
                       {!isPast && (
                         <View style={{ paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6,
-                                       backgroundColor: days <= 3 ? 'rgba(239,68,68,0.08)' : days <= 7 ? 'rgba(245,158,11,0.08)' : P_GHOST }}>
+                          backgroundColor: days <= 3 ? 'rgba(239,68,68,0.10)' : days <= 7 ? 'rgba(245,158,11,0.10)' : 'rgba(26,159,227,0.10)',
+                          borderWidth: StyleSheet.hairlineWidth,
+                          borderColor: days <= 3 ? 'rgba(239,68,68,0.25)' : days <= 7 ? 'rgba(245,158,11,0.25)' : T.border }}>
                           <Text style={{ fontSize: 10, fontWeight: '700',
-                                         color: days <= 3 ? DANGER : days <= 7 ? WARNING : PRIMARY }}>
+                            color: days <= 3 ? DANGER : days <= 7 ? WARNING : BLUE }}>
                             {days === 0 ? "Auj." : `J-${days}`}
                           </Text>
                         </View>
                       )}
-                      <Ionicons name="chevron-forward" size={14} color={C.textMuted}/>
+                      <Ionicons name="chevron-forward" size={14} color={T.muted}/>
                     </View>
+                    <View pointerEvents="none" style={{position:'absolute',top:0,left:0,right:0,bottom:0,
+                      borderRadius:12,borderWidth:StyleSheet.hairlineWidth,borderColor:T.border}}/>
                   </TouchableOpacity>
                 );
               })}
@@ -435,11 +444,13 @@ export default function CalendarScreen() {
 
           {monthEvents.length === 0 && !loading && (
             <View style={{ alignItems: 'center', paddingVertical: 40, gap: 12 }}>
-              <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: P_LIGHT, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="calendar-outline" size={28} color={PRIMARY}/>
+              <View style={{ width: 64, height: 64, borderRadius: 32,
+                backgroundColor: 'rgba(26,159,227,0.10)', alignItems: 'center', justifyContent: 'center',
+                borderWidth: 1, borderColor: T.borderHi }}>
+                <Ionicons name="calendar-outline" size={28} color={BLUE}/>
               </View>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: C.text }}>Aucun événement ce mois</Text>
-              <Text style={{ color: C.textSub, fontSize: 12, textAlign: 'center' }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: T.white }}>Aucun événement ce mois</Text>
+              <Text style={{ color: T.offWhite, fontSize: 12, textAlign: 'center' }}>
                 Naviguez vers un autre mois ou créez un événement.
               </Text>
             </View>
@@ -448,7 +459,6 @@ export default function CalendarScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      {/* ── DAY MODAL ── */}
       <DayModal
         visible={modalVisible}
         date={selectedDay ?? today}
@@ -461,12 +471,10 @@ export default function CalendarScreen() {
 }
 
 const cal = StyleSheet.create({
-  grid:     { backgroundColor: C.surface, borderRadius: 16, padding: 12, borderWidth: 1, borderColor: C.border,
-              shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 3 },
-  evtCard:  { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderRadius: 12,
-              padding: 14, borderLeftWidth: 3, borderWidth: 1, borderColor: C.border,
-              shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 },
-  evtTitle: { fontSize: 14, fontWeight: '700', color: C.text },
-  evtDate:  { fontSize: 12, color: C.textSub },
-  evtLoc:   { fontSize: 11, color: C.textMuted },
+  grid   : { borderRadius: 16, padding: 12, borderWidth: 1, overflow: 'hidden' },
+  evtCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 12,
+    padding: 14, borderLeftWidth: 3, borderWidth: 1, overflow: 'hidden' },
+  evtTitle: { fontSize: 14, fontWeight: '700' },
+  evtDate : { fontSize: 12 },
+  evtLoc  : { fontSize: 11 },
 });

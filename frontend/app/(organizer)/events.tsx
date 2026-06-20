@@ -1,399 +1,532 @@
 /**
- * app/(organizer)/events.tsx — EVENTURE v3
- * Gestion multi-événements : liste, search, filter, card actions
+ * app/(organizer)/events.tsx — EVENTURE v3 · Liste des Événements
+ * Dark futuristic theme — gradient covers, filter chips, stats row
  */
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  memo, useCallback, useEffect, useRef, useState,
+} from 'react';
 import {
-  Animated, Dimensions, Easing, RefreshControl, ScrollView,
-  StyleSheet, Text, TextInput, TouchableOpacity, View,
+  Animated, FlatList, Platform, RefreshControl,
+  ScrollView, StatusBar, StyleSheet,
+  Text, TouchableOpacity, View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons }       from '@expo/vector-icons';
-import { SafeAreaView }   from 'react-native-safe-area-context';
-import { useRouter }      from 'expo-router';
-import { supabase }       from '@/lib/supabase';
+import { LinearGradient }            from 'expo-linear-gradient';
+import { useSafeAreaInsets }         from 'react-native-safe-area-context';
+import { useRouter }                 from 'expo-router';
+import { supabase }                  from '@/lib/supabase';
+import { getWorkingOrganizerId }     from '@/lib/mockUser';
 
-/* ─── Design tokens ─────────────────────────────────────────────────────── */
-const { width: SW } = Dimensions.get('window');
-const BG      = '#F8FAFC';
-const PRIMARY = '#6366F1';
-const P_LIGHT = '#EEF2FF';
-const P_GHOST = 'rgba(99,102,241,0.08)';
-const SUCCESS = '#10B981';
-const WARNING = '#F59E0B';
-const DANGER  = '#EF4444';
-const BLUE    = '#3B82F6';
-const EDGE    = 16;
+/* ─── Design tokens ──────────────────────────────────────────────────────── */
+const BG    = '#050E1B';
+const BLUE  = '#1A9FE3';
+const CYAN  = '#38BDF8';
+const GOLD  = '#F5C842';
+const NAVY  = '#0C1A30';
+const WHITE = '#FFFFFF';
+const MUTED = 'rgba(255,255,255,0.55)';
+const FAINT = 'rgba(255,255,255,0.08)';
+const EDGE  = 18;
 
-const C = {
-  text:      '#111827',
-  textSub:   '#6B7280',
-  textMuted: '#9CA3AF',
-  border:    '#E5E7EB',
-  surface:   '#FFFFFF',
-  surfaceAlt:'#F1F5F9',
-} as const;
+/* ─── Event-type colours (gradient covers) ───────────────────────────────── */
+const TYPE_COLORS: Record<string, [string, string]> = {
+  'Techno':     ['#1A0836', '#7C3AED'],
+  'House':      ['#031A2E', '#1A9FE3'],
+  'Rock':       ['#1A0808', '#EF4444'],
+  'Festival':   ['#0F0A00', '#F59E0B'],
+  'Gala':       ['#0A0A0F', '#8B5CF6'],
+  'Conférence': ['#001A1A', '#0D9488'],
+};
+const DEFAULT_COLORS: [string, string] = ['#0A1628', '#1A9FE3'];
+
+const TYPE_ICONS: Record<string, string> = {
+  'Techno':     '⚡',
+  'House':      '🎵',
+  'Rock':       '🎸',
+  'Festival':   '🎪',
+  'Gala':       '✨',
+  'Conférence': '🎤',
+};
+
+/* ─── Status badge config ────────────────────────────────────────────────── */
+const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  published : { label: 'PUBLIÉ',    color: '#10B981', bg: 'rgba(16,185,129,0.18)' },
+  draft     : { label: 'BROUILLON', color: '#94A3B8', bg: 'rgba(148,163,184,0.15)' },
+  ongoing   : { label: 'EN COURS',  color: '#F59E0B', bg: 'rgba(245,158,11,0.18)' },
+  completed : { label: 'TERMINÉ',   color: '#60A5FA', bg: 'rgba(96,165,250,0.18)' },
+  cancelled : { label: 'ANNULÉ',    color: '#EF4444', bg: 'rgba(239,68,68,0.18)'  },
+};
+
+/* ─── Filter chips ───────────────────────────────────────────────────────── */
+const FILTERS = ['Tous', 'Techno', 'House', 'Rock', 'Festival', 'Gala', 'Conférence', 'Publié', 'Brouillon'];
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
-interface EventRow {
-  id:         string;
-  title:      string;
+type EventStatus = 'draft' | 'published' | 'ongoing' | 'completed' | 'cancelled';
+
+interface Event {
+  id: string;
+  organizer_id: string;
+  title: string;
+  type: string;
   date_start: string;
-  date_end:   string | null;
-  location:   string;
-  status:     string;
-  type:       string | null;
-  budget:     number | null;
+  date_end: string;
+  location: string;
+  budget: number;
+  description: string;
+  status: EventStatus;
+  cover_url: string | null;
 }
 
-type FilterTab = 'all' | 'published' | 'draft' | 'done';
+/* ─── Helpers ─────────────────────────────────────────────────────────────── */
+function formatEventDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    const day = new Intl.DateTimeFormat('fr-FR', { weekday: 'short' }).format(d);
+    const date = new Intl.DateTimeFormat('fr-FR', {
+      day: '2-digit', month: 'short', year: 'numeric',
+    }).format(d);
+    const time = new Intl.DateTimeFormat('fr-FR', {
+      hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(d);
+    const capDay = day.charAt(0).toUpperCase() + day.slice(1).replace('.', '');
+    return `${capDay} ${date}, ${time.replace(':', 'h')}`;
+  } catch {
+    return iso;
+  }
+}
 
-/* ─── Helpers ────────────────────────────────────────────────────────────── */
-const fmtDate = (iso: string) =>
-  new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
-const daysUntil = (iso: string) =>
-  Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000);
+function formatBudget(n: number): string {
+  return new Intl.NumberFormat('fr-FR').format(n) + ' €';
+}
 
-const STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
-  published: { label: 'Actif',     color: SUCCESS, bg: 'rgba(16,185,129,0.10)' },
-  draft:     { label: 'Brouillon', color: WARNING, bg: 'rgba(245,158,11,0.10)' },
-  done:      { label: 'Terminé',   color: C.textMuted, bg: C.surfaceAlt },
-  cancelled: { label: 'Annulé',    color: DANGER,  bg: 'rgba(239,68,68,0.10)' },
-};
-const TYPE_COLORS: Record<string, string> = {
-  Festival: SUCCESS, Gala: '#F59E0B', Conférence: BLUE,
-  Mariage: '#EC4899', Séminaire: '#8B5CF6', Concert: DANGER, Sport: SUCCESS,
-};
+/* ─── Particle Background ────────────────────────────────────────────────── */
+const NUM_P = 28;
+const PCOLS = [
+  '#1A9FE3', 'rgba(26,159,227,0.4)', '#38BDF8',
+  'rgba(56,189,248,0.32)', 'rgba(255,255,255,0.16)',
+];
+const PARTS = Array.from({ length: NUM_P }, (_, i) => ({
+  x: (Math.sin(i * 2.39996) * 0.5 + 0.5) * 100,
+  y: (Math.cos(i * 1.61803) * 0.5 + 0.5) * 100,
+  s: 1.5 + (i % 5) * 0.9,
+  c: PCOLS[i % PCOLS.length],
+  d: 2000 + (i % 7) * 800,
+}));
 
-/* ─── Event Card ─────────────────────────────────────────────────────────── */
-const EvtCard = memo(function EvtCard({
-  evt, index, onPress, onMissions, onStaff,
-}: { evt: EventRow; index: number; onPress: () => void; onMissions: () => void; onStaff: () => void }) {
-  const enter = useRef(new Animated.Value(0)).current;
-  const press = useRef(new Animated.Value(1)).current;
-
+const ParticleBg = memo(function ParticleBg() {
+  const op = useRef(new Animated.Value(0.4)).current;
   useEffect(() => {
-    Animated.timing(enter, {
-      toValue: 1, duration: 320,
-      delay: Math.min(index * 50, 250),
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(op, { toValue: 0.85, duration: 2800, useNativeDriver: true }),
+        Animated.timing(op, { toValue: 0.4,  duration: 2800, useNativeDriver: true }),
+      ])
+    ).start();
   }, []);
-
-  const onPI = () => Animated.spring(press, { toValue: 0.97, useNativeDriver: true, tension: 300, friction: 10 }).start();
-  const onPO = () => Animated.spring(press, { toValue: 1,    useNativeDriver: true, tension: 300, friction: 10 }).start();
-
-  const cfg  = STATUS_CFG[evt.status] ?? STATUS_CFG.draft;
-  const tc   = TYPE_COLORS[evt.type ?? ''] ?? PRIMARY;
-  const days = daysUntil(evt.date_start);
-  const isPast = days < 0;
-
   return (
-    <Animated.View style={{
-      opacity: enter,
-      transform: [
-        { translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) },
-        { scale: press },
-      ],
-      marginBottom: 12,
-    }}>
-      <TouchableOpacity
-        style={cd.card}
-        onPress={onPress} onPressIn={onPI} onPressOut={onPO}
-        activeOpacity={1}
-      >
-        {/* Color bar + gradient */}
-        <LinearGradient colors={[`${tc}10`, `${tc}02`]} style={[StyleSheet.absoluteFill, { borderRadius: 14 }]}/>
-        <View style={[cd.colorBar, { backgroundColor: tc }]}/>
-
-        {/* Header */}
-        <View style={cd.row}>
-          <View style={[cd.typeIconWrap, { backgroundColor: `${tc}15` }]}>
-            <Ionicons name="calendar-outline" size={16} color={tc}/>
-          </View>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text style={cd.title} numberOfLines={1}>{evt.title}</Text>
-            {evt.type && <Text style={[cd.type, { color: tc }]}>{evt.type}</Text>}
-          </View>
-          <View style={[cd.badge, { backgroundColor: cfg.bg }]}>
-            <Text style={[cd.badgeTxt, { color: cfg.color }]}>{cfg.label}</Text>
-          </View>
-        </View>
-
-        {/* Meta info */}
-        <View style={{ gap: 6 }}>
-          <View style={cd.metaRow}>
-            <Ionicons name="time-outline" size={13} color={C.textMuted}/>
-            <Text style={cd.meta}>
-              {fmtDate(evt.date_start)}
-              {evt.date_end ? ` → ${fmtDate(evt.date_end)}` : ''}
-            </Text>
-            {!isPast && (
-              <View style={[cd.daysBadge, { backgroundColor: days <= 3 ? 'rgba(239,68,68,0.08)' : days <= 7 ? 'rgba(245,158,11,0.08)' : P_GHOST }]}>
-                <Text style={[cd.daysTxt, { color: days <= 3 ? DANGER : days <= 7 ? WARNING : PRIMARY }]}>
-                  {days === 0 ? "Auj." : `J-${days}`}
-                </Text>
-              </View>
-            )}
-          </View>
-          <View style={cd.metaRow}>
-            <Ionicons name="location-outline" size={13} color={C.textMuted}/>
-            <Text style={cd.meta} numberOfLines={1}>{evt.location}</Text>
-          </View>
-          {evt.budget != null && evt.budget > 0 && (
-            <View style={cd.metaRow}>
-              <Ionicons name="cash-outline" size={13} color={C.textMuted}/>
-              <Text style={cd.meta}>{evt.budget.toLocaleString('fr-FR')} €</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Divider */}
-        <View style={cd.divider}/>
-
-        {/* Actions */}
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <TouchableOpacity style={[cd.action, cd.actionPrimary]} onPress={onPress} activeOpacity={0.8}>
-            <Ionicons name="eye-outline" size={14} color={PRIMARY}/>
-            <Text style={[cd.actionTxt, { color: PRIMARY }]}>Détails</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[cd.action, cd.actionSecondary]} onPress={onMissions} activeOpacity={0.8}>
-            <Ionicons name="clipboard-outline" size={14} color={C.textSub}/>
-            <Text style={[cd.actionTxt, { color: C.textSub }]}>Missions</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[cd.action, cd.actionSecondary]} onPress={onStaff} activeOpacity={0.8}>
-            <Ionicons name="people-outline" size={14} color={C.textSub}/>
-            <Text style={[cd.actionTxt, { color: C.textSub }]}>Staff</Text>
-          </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-});
-const cd = StyleSheet.create({
-  card:        { backgroundColor: C.surface, borderRadius: 14, padding: 16, paddingLeft: 20, gap: 12,
-                 borderWidth: 1, borderColor: C.border, overflow: 'hidden',
-                 shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
-  colorBar:    { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, borderTopLeftRadius: 14, borderBottomLeftRadius: 14 },
-  row:         { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  typeIconWrap:{ width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  title:       { fontSize: 15, fontWeight: '800', color: C.text, flex: 1 },
-  type:        { fontSize: 11, fontWeight: '600' },
-  badge:       { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, flexShrink: 0 },
-  badgeTxt:    { fontSize: 10, fontWeight: '700' },
-  metaRow:     { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  meta:        { fontSize: 12, color: C.textSub, flex: 1 },
-  daysBadge:   { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, flexShrink: 0 },
-  daysTxt:     { fontSize: 10, fontWeight: '700' },
-  divider:     { height: 1, backgroundColor: C.border },
-  action:      { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 8, borderRadius: 8 },
-  actionPrimary:  { backgroundColor: P_GHOST },
-  actionSecondary:{ backgroundColor: C.surfaceAlt },
-  actionTxt:   { fontSize: 12, fontWeight: '700' },
-});
-
-/* ─── Skeleton ───────────────────────────────────────────────────────────── */
-const Skeleton = memo(() => {
-  const a = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const loop = Animated.loop(Animated.sequence([
-      Animated.timing(a, { toValue: 1, duration: 800, useNativeDriver: true }),
-      Animated.timing(a, { toValue: 0, duration: 800, useNativeDriver: true }),
-    ]));
-    loop.start(); return () => loop.stop();
-  }, []);
-  const op = a.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
-  return (
-    <View style={{ gap: 12 }}>
-      {[0, 1, 2].map(i => (
-        <Animated.View key={i} style={{ height: 180, borderRadius: 14, backgroundColor: '#E5E7EB', opacity: op }}/>
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <LinearGradient colors={[BG, '#091628', BG]} style={StyleSheet.absoluteFill}/>
+      {PARTS.map((p, i) => (
+        <Animated.View
+          key={i}
+          style={{
+            position: 'absolute',
+            left: `${p.x}%` as any,
+            top:  `${p.y}%` as any,
+            width: p.s, height: p.s, borderRadius: p.s / 2,
+            backgroundColor: p.c,
+            opacity: op,
+          }}
+        />
       ))}
     </View>
   );
 });
 
+/* ─── Skeleton Card ──────────────────────────────────────────────────────── */
+const SkeletonCard = memo(function SkeletonCard() {
+  const a = useRef(new Animated.Value(0.3)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(a, { toValue: 0.6, duration: 750, useNativeDriver: true }),
+        Animated.timing(a, { toValue: 0.3, duration: 750, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+  return (
+    <Animated.View style={[sk.card, { opacity: a }]}>
+      <View style={sk.banner}/>
+      <View style={sk.body}>
+        <View style={sk.line1}/>
+        <View style={sk.line2}/>
+        <View style={sk.line3}/>
+      </View>
+    </Animated.View>
+  );
+});
+const sk = StyleSheet.create({
+  card  : { marginHorizontal: EDGE, marginBottom: 16, borderRadius: 20, overflow: 'hidden',
+             backgroundColor: NAVY, height: 200 },
+  banner: { height: 100, backgroundColor: 'rgba(255,255,255,0.07)' },
+  body  : { padding: 14, gap: 10 },
+  line1 : { height: 16, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.07)', width: '70%' },
+  line2 : { height: 12, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.05)', width: '50%' },
+  line3 : { height: 12, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.05)', width: '40%' },
+});
+
+/* ─── Event Card ─────────────────────────────────────────────────────────── */
+interface EventCardProps {
+  event: Event;
+  onEdit: (id: string) => void;
+  onView: (id: string) => void;
+}
+const EventCard = memo(function EventCard({ event, onEdit, onView }: EventCardProps) {
+  const colors = TYPE_COLORS[event.type] ?? DEFAULT_COLORS;
+  const icon   = TYPE_ICONS[event.type]  ?? '🎉';
+  const status = STATUS_CONFIG[event.status] ?? STATUS_CONFIG.draft;
+
+  return (
+    <View style={ec.card}>
+      {/* ── Banner ── */}
+      <View style={ec.banner}>
+        <LinearGradient
+          colors={colors}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        {/* Type icon */}
+        <Text style={ec.typeIcon}>{icon}</Text>
+        {/* Status badge */}
+        <View style={[ec.statusBadge, { backgroundColor: status.bg }]}>
+          <Text style={[ec.statusText, { color: status.color }]}>{status.label}</Text>
+        </View>
+        {/* Type label */}
+        <View style={ec.typeLabel}>
+          <Text style={ec.typeLabelText}>{event.type || 'Événement'}</Text>
+        </View>
+      </View>
+
+      {/* ── Content ── */}
+      <View style={ec.content}>
+        <Text style={ec.title} numberOfLines={1}>{event.title}</Text>
+
+        <View style={ec.metaRow}>
+          <Text style={ec.metaIcon}>📅</Text>
+          <Text style={ec.metaText}>{formatEventDate(event.date_start)}</Text>
+        </View>
+
+        <View style={ec.metaRow}>
+          <Text style={ec.metaIcon}>📍</Text>
+          <Text style={ec.metaText} numberOfLines={1}>{event.location || '—'}</Text>
+        </View>
+
+        <View style={ec.footer}>
+          <Text style={ec.budget}>{formatBudget(event.budget ?? 0)}</Text>
+          <View style={ec.actions}>
+            <TouchableOpacity
+              style={[ec.actionBtn, { borderColor: 'rgba(26,159,227,0.3)', backgroundColor: 'rgba(26,159,227,0.08)' }]}
+              onPress={() => onEdit(event.id)}
+              activeOpacity={0.75}
+            >
+              <Text style={[ec.actionText, { color: BLUE }]}>✏️ Modifier</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[ec.actionBtn, { borderColor: 'rgba(56,189,248,0.3)', backgroundColor: 'rgba(56,189,248,0.08)' }]}
+              onPress={() => onView(event.id)}
+              activeOpacity={0.75}
+            >
+              <Text style={[ec.actionText, { color: CYAN }]}>👁 Voir</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+});
+const ec = StyleSheet.create({
+  card      : { marginHorizontal: EDGE, marginBottom: 16, borderRadius: 20, overflow: 'hidden',
+                backgroundColor: NAVY,
+                shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.25, shadowRadius: 12, elevation: 6 },
+  banner    : { height: 100, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  typeIcon  : { fontSize: 48, textAlign: 'center' },
+  statusBadge: { position: 'absolute', top: 10, left: 10,
+                 paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8 },
+  statusText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  typeLabel : { position: 'absolute', top: 10, right: 10,
+                backgroundColor: 'rgba(0,0,0,0.35)',
+                paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8 },
+  typeLabelText: { fontSize: 10, fontWeight: '700', color: WHITE, letterSpacing: 0.3 },
+  content   : { padding: 14, gap: 6 },
+  title     : { fontSize: 17, fontWeight: '800', color: WHITE, letterSpacing: -0.3, marginBottom: 2 },
+  metaRow   : { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  metaIcon  : { fontSize: 12 },
+  metaText  : { fontSize: 12, color: MUTED, fontWeight: '500', flex: 1 },
+  footer    : { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
+  budget    : { fontSize: 15, fontWeight: '900', color: GOLD },
+  actions   : { flexDirection: 'row', gap: 8 },
+  actionBtn : { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
+  actionText: { fontSize: 11, fontWeight: '700' },
+});
+
+/* ─── Empty state ────────────────────────────────────────────────────────── */
+interface EmptyStateProps { onCreate: () => void }
+const EmptyState = memo(function EmptyState({ onCreate }: EmptyStateProps) {
+  return (
+    <View style={es.wrap}>
+      <Text style={es.emoji}>🗓️</Text>
+      <Text style={es.title}>Aucun événement</Text>
+      <Text style={es.sub}>Créez votre premier événement</Text>
+      <TouchableOpacity style={es.btn} onPress={onCreate} activeOpacity={0.8}>
+        <LinearGradient
+          colors={[BLUE, CYAN]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <Text style={es.btnText}>+ Créer</Text>
+      </TouchableOpacity>
+    </View>
+  );
+});
+const es = StyleSheet.create({
+  wrap  : { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 12 },
+  emoji : { fontSize: 64 },
+  title : { fontSize: 22, fontWeight: '900', color: WHITE },
+  sub   : { fontSize: 14, color: MUTED, fontWeight: '500' },
+  btn   : { marginTop: 12, paddingHorizontal: 28, paddingVertical: 14, borderRadius: 14,
+             overflow: 'hidden',
+             shadowColor: BLUE, shadowOffset: { width: 0, height: 4 },
+             shadowOpacity: 0.35, shadowRadius: 10, elevation: 6 },
+  btnText: { color: WHITE, fontWeight: '800', fontSize: 15 },
+});
+
+/* ─── Stats Row ──────────────────────────────────────────────────────────── */
+interface StatsRowProps {
+  totalBudget: number;
+  upcomingCount: number;
+  totalSlots: number;
+}
+const StatsRow = memo(function StatsRow({ totalBudget, upcomingCount, totalSlots }: StatsRowProps) {
+  const chips = [
+    { icon: '💰', value: formatBudget(totalBudget), label: 'Budget total', color: GOLD },
+    { icon: '📅', value: String(upcomingCount),     label: 'À venir',      color: BLUE },
+    { icon: '👥', value: String(totalSlots),        label: 'Postes',       color: CYAN },
+  ];
+  return (
+    <View style={str.row}>
+      {chips.map(c => (
+        <View key={c.label} style={[str.chip, { borderColor: `${c.color}28` }]}>
+          <LinearGradient
+            colors={[`${c.color}14`, `${c.color}05`]}
+            style={StyleSheet.absoluteFill}
+          />
+          <Text style={str.chipIcon}>{c.icon}</Text>
+          <Text style={[str.chipValue, { color: c.color }]} numberOfLines={1}>{c.value}</Text>
+          <Text style={str.chipLabel}>{c.label}</Text>
+        </View>
+      ))}
+    </View>
+  );
+});
+const str = StyleSheet.create({
+  row      : { flexDirection: 'row', gap: 10, paddingHorizontal: EDGE, marginBottom: 14 },
+  chip     : { flex: 1, borderRadius: 14, borderWidth: 1, padding: 12, gap: 3,
+               alignItems: 'center', overflow: 'hidden',
+               backgroundColor: NAVY },
+  chipIcon : { fontSize: 18, marginBottom: 2 },
+  chipValue: { fontSize: 12, fontWeight: '900', letterSpacing: -0.3, textAlign: 'center' },
+  chipLabel: { fontSize: 9, fontWeight: '600', color: MUTED, textAlign: 'center' },
+});
+
 /* ─── SCREEN ─────────────────────────────────────────────────────────────── */
 export default function EventsScreen() {
-  const router = useRouter();
+  const router  = useRouter();
+  const insets  = useSafeAreaInsets();
 
-  const [events,    setEvents]    = useState<EventRow[]>([]);
-  const [loading,   setLoading]   = useState(true);
-  const [refreshing,setRefreshing]= useState(false);
-  const [tab,       setTab]       = useState<FilterTab>('all');
-  const [search,    setSearch]    = useState('');
-  const [searchFocus,setSearchFocus]=useState(false);
+  const [events,     setEvents]     = useState<Event[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [filter,     setFilter]     = useState('Tous');
+  const [totalSlots, setTotalSlots] = useState(0);
 
+  /* ── Fetch ── */
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const uid = session.user.id;
-      const { data } = await supabase
+      const orgId = await getWorkingOrganizerId();
+      if (!orgId) return;
+
+      const { data, error } = await supabase
         .from('events')
-        .select('id,title,date_start,date_end,location,status,type,budget')
-        .eq('organizer_id', uid)
-        .order('date_start', { ascending: false });
-      setEvents((data ?? []) as EventRow[]);
-    } catch (e) { console.error('[events]', e); }
-    finally { setLoading(false); setRefreshing(false); }
+        .select('*')
+        .eq('organizer_id', orgId)
+        .order('date_start', { ascending: true });
+
+      if (error) { console.error('[events] fetch', error); }
+      else        { setEvents((data ?? []) as Event[]); }
+
+      /* Fetch total slots from event_roles */
+      if (data && data.length > 0) {
+        const evtIds = data.map((e: any) => e.id);
+        const { data: roles } = await supabase
+          .from('event_roles')
+          .select('slots_available')
+          .in('event_id', evtIds);
+        const slots = (roles ?? []).reduce((s: number, r: any) => s + (Number(r.slots_available) || 0), 0);
+        setTotalSlots(slots);
+      }
+    } catch (e) {
+      console.error('[events]', e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
-  // Realtime
-  useEffect(() => {
-    let alive = true;
-    const ch = supabase.channel(`evts_rt_${Date.now()}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => { if (alive) load(true); })
-      .subscribe();
-    return () => { alive = false; supabase.removeChannel(ch); };
-  }, [load]);
+  /* ── Derived stats ── */
+  const totalBudget   = events.reduce((s, e) => s + (Number(e.budget) || 0), 0);
+  const upcomingCount = events.filter(e => e.status === 'published').length;
 
-  const filtered = useMemo(() => {
-    let list = tab === 'all' ? events : events.filter(e => e.status === tab);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(e => e.title.toLowerCase().includes(q) || e.location.toLowerCase().includes(q));
-    }
-    return list;
-  }, [events, tab, search]);
+  /* ── Filter ── */
+  const filtered = events.filter(e => {
+    if (filter === 'Tous')      return true;
+    if (filter === 'Publié')    return e.status === 'published';
+    if (filter === 'Brouillon') return e.status === 'draft';
+    return e.type === filter;
+  });
 
-  const counts: Record<FilterTab, number> = {
-    all:       events.length,
-    published: events.filter(e => e.status === 'published').length,
-    draft:     events.filter(e => e.status === 'draft').length,
-    done:      events.filter(e => e.status === 'done').length,
-  };
+  /* ── Handlers ── */
+  const handleCreate = useCallback(() => {
+    router.push('/(organizer)/create-event' as any);
+  }, [router]);
 
-  const TABS: { key: FilterTab; label: string }[] = [
-    { key: 'all',       label: 'Tous' },
-    { key: 'published', label: 'Actifs' },
-    { key: 'draft',     label: 'Brouillons' },
-    { key: 'done',      label: 'Terminés' },
-  ];
+  const handleEdit = useCallback((id: string) => {
+    router.push({ pathname: '/(organizer)/create-event' as any, params: { eventId: id } });
+  }, [router]);
+
+  const handleView = useCallback((id: string) => {
+    router.push({ pathname: '/(organizer)/create-event' as any, params: { eventId: id, view: '1' } });
+  }, [router]);
+
+  /* ── List header (filter chips + stats) ── */
+  const ListHeader = (
+    <>
+      {/* Filter bar */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: EDGE, gap: 8, paddingBottom: 14 }}
+        style={{ marginBottom: 4 }}
+      >
+        {FILTERS.map(f => {
+          const active = filter === f;
+          return (
+            <TouchableOpacity
+              key={f}
+              style={[
+                fc.chip,
+                active
+                  ? { backgroundColor: BLUE }
+                  : { backgroundColor: FAINT },
+              ]}
+              onPress={() => setFilter(f)}
+              activeOpacity={0.75}
+            >
+              <Text style={[fc.chipText, { color: active ? WHITE : MUTED }]}>{f}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {/* Stats row */}
+      <StatsRow
+        totalBudget={totalBudget}
+        upcomingCount={upcomingCount}
+        totalSlots={totalSlots}
+      />
+    </>
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: BG }}>
-      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+      <StatusBar barStyle="light-content" backgroundColor={BG}/>
+      <ParticleBg/>
 
-        {/* ── HEADER ── */}
-        <View style={{ paddingHorizontal: EDGE, paddingTop: 12, paddingBottom: 8, gap: 12 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <View>
-              <Text style={{ fontSize: 22, fontWeight: '800', color: C.text }}>Événements</Text>
-              <Text style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>{counts.all} événements</Text>
-            </View>
-            <TouchableOpacity
-              style={{ backgroundColor: PRIMARY, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12,
-                       shadowColor: PRIMARY, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 }}
-              onPress={() => router.push('/(organizer)/create-event' as any)}
-              activeOpacity={0.82}
-            >
-              <Ionicons name="add" size={16} color="#FFF"/>
-              <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Créer</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Search */}
-          <View style={[hs.searchWrap, searchFocus && hs.searchFocused]}>
-            <Ionicons name="search-outline" size={16} color={searchFocus ? PRIMARY : C.textMuted}/>
-            <TextInput
-              style={hs.searchInput}
-              placeholder="Rechercher un événement..."
-              placeholderTextColor={C.textMuted}
-              value={search}
-              onChangeText={setSearch}
-              onFocus={() => setSearchFocus(true)}
-              onBlur={() => setSearchFocus(false)}
-            />
-            {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch('')} activeOpacity={0.7}>
-                <Ionicons name="close-circle" size={16} color={C.textMuted}/>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Filter tabs */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 2 }}>
-            {TABS.map(({ key, label }) => (
-              <TouchableOpacity
-                key={key}
-                style={[hs.chip, tab === key && hs.chipActive]}
-                onPress={() => setTab(key)}
-                activeOpacity={0.75}
-              >
-                <Text style={[hs.chipTxt, tab === key && hs.chipTxtActive]}>{label}</Text>
-                {counts[key] > 0 && (
-                  <View style={[hs.chipBadge, tab === key && hs.chipBadgeActive]}>
-                    <Text style={[hs.chipBadgeTxt, tab === key && { color: PRIMARY }]}>{counts[key]}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+      {/* ── Top bar ── */}
+      <View style={[ds.topBar, { paddingTop: insets.top + 8 }]}>
+        <View>
+          <Text style={ds.pageTitle}>Mes Événements</Text>
+          <Text style={ds.subtitle}>
+            {loading ? '…' : `${filtered.length} événement${filtered.length !== 1 ? 's' : ''}`}
+          </Text>
         </View>
+        <TouchableOpacity style={ds.addBtn} onPress={handleCreate} activeOpacity={0.8}>
+          <LinearGradient
+            colors={[BLUE, CYAN]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <Text style={ds.addBtnText}>+</Text>
+        </TouchableOpacity>
+      </View>
 
-        {/* ── LIST ── */}
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: EDGE, paddingBottom: 120, paddingTop: 4 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={PRIMARY}/>}
-        >
-          {loading ? <Skeleton/> : (
-            filtered.length === 0 ? (
-              <View style={{ alignItems: 'center', paddingTop: 80, gap: 16 }}>
-                <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: P_LIGHT, alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="calendar-outline" size={32} color={PRIMARY}/>
-                </View>
-                <Text style={{ fontSize: 17, fontWeight: '700', color: C.text }}>
-                  {search ? 'Aucun résultat' : 'Aucun événement'}
-                </Text>
-                <Text style={{ color: C.textSub, fontSize: 13, textAlign: 'center', lineHeight: 19 }}>
-                  {search ? `Aucun résultat pour "${search}"` : 'Créez votre premier événement pour démarrer.'}
-                </Text>
-                {!search && (
-                  <TouchableOpacity
-                    style={{ backgroundColor: PRIMARY, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10,
-                             shadowColor: PRIMARY, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 }}
-                    onPress={() => router.push('/(organizer)/create-event' as any)}
-                    activeOpacity={0.82}
-                  >
-                    <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 14 }}>+ Créer un événement</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            ) : (
-              filtered.map((evt, i) => (
-                <EvtCard
-                  key={evt.id}
-                  evt={evt}
-                  index={i}
-                  onPress={() => router.push({ pathname: '/(organizer)/event/[id]', params: { id: evt.id } } as any)}
-                  onMissions={() => router.push('/(organizer)/missions' as any)}
-                  onStaff={() => router.push('/(organizer)/staff' as any)}
-                />
-              ))
-            )
+      {/* ── Content ── */}
+      {loading ? (
+        <View style={{ paddingTop: 16 }}>
+          {[0, 1, 2].map(i => <SkeletonCard key={i}/>)}
+        </View>
+      ) : (
+        <FlatList
+          data={filtered}
+          keyExtractor={item => item.id}
+          renderItem={({ item }) => (
+            <EventCard event={item} onEdit={handleEdit} onView={handleView}/>
           )}
-        </ScrollView>
-      </SafeAreaView>
+          ListHeaderComponent={ListHeader}
+          ListEmptyComponent={<EmptyState onCreate={handleCreate}/>}
+          contentContainerStyle={{
+            paddingTop: 14,
+            paddingBottom: insets.bottom + 120,
+            flexGrow: 1,
+          }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => { setRefreshing(true); load(true); }}
+              tintColor={BLUE}
+            />
+          }
+        />
+      )}
     </View>
   );
 }
 
-const hs = StyleSheet.create({
-  searchWrap:   { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.surface,
-                  borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: C.border },
-  searchFocused:{ borderColor: PRIMARY, backgroundColor: P_GHOST },
-  searchInput:  { flex: 1, fontSize: 14, color: C.text, padding: 0 },
-  chip:         { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7,
-                  borderRadius: 20, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border },
-  chipActive:   { backgroundColor: P_LIGHT, borderColor: PRIMARY },
-  chipTxt:      { fontSize: 13, fontWeight: '600', color: C.textSub },
-  chipTxtActive:{ color: PRIMARY, fontWeight: '700' },
-  chipBadge:    { backgroundColor: C.surfaceAlt, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1 },
-  chipBadgeActive:{ backgroundColor: P_LIGHT },
-  chipBadgeTxt: { fontSize: 10, fontWeight: '700', color: C.textMuted },
+/* ─── Styles ─────────────────────────────────────────────────────────────── */
+const ds = StyleSheet.create({
+  topBar   : { paddingHorizontal: EDGE, paddingBottom: 14,
+               borderBottomWidth: StyleSheet.hairlineWidth,
+               borderBottomColor: 'rgba(26,159,227,0.12)',
+               flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+               zIndex: 10 },
+  pageTitle: { fontSize: 28, fontWeight: '900', color: WHITE, letterSpacing: -0.5 },
+  subtitle : { fontSize: 12, color: MUTED, fontWeight: '500', marginTop: 2 },
+  addBtn   : { width: 42, height: 42, borderRadius: 13, alignItems: 'center',
+               justifyContent: 'center', overflow: 'hidden',
+               shadowColor: BLUE, shadowOffset: { width: 0, height: 3 },
+               shadowOpacity: 0.4, shadowRadius: 8, elevation: 6 },
+  addBtnText: { color: WHITE, fontSize: 22, fontWeight: '300', lineHeight: 26, marginTop: -1 },
+});
+
+const fc = StyleSheet.create({
+  chip    : { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+  chipText: { fontSize: 13, fontWeight: '700' },
 });
