@@ -37,8 +37,8 @@ const T = {
   faint   : 'rgba(255,255,255,0.18)',
   surf    : 'rgba(255,255,255,0.045)',
   surfHi  : 'rgba(255,255,255,0.09)',
-  border  : 'rgba(26,159,227,0.12)',
-  borderHi: 'rgba(26,159,227,0.30)',
+  border  : 'rgba(255,255,255,0.05)',
+  borderHi: 'rgba(255,255,255,0.12)',
   navy    : '#0C1A30',
   amber   : 'rgba(255,255,255,0.65)',
   red     : 'rgba(255,255,255,0.45)',
@@ -77,7 +77,7 @@ interface AppDetail {
 /* ─── Status config ────────────────────────────────────────────────────── */
 const SV: Record<AppStatus, { l: string; c: string; bg: string; border: string }> = {
   pending  : { l: 'En attente',   c: T.amber,  bg: 'rgba(255,255,255,0.07)',  border: 'rgba(255,255,255,0.18)'  },
-  accepted : { l: 'Accepté',      c: BLUE,     bg: 'rgba(26,159,227,0.10)',   border: 'rgba(26,159,227,0.22)'   },
+  accepted : { l: 'Accepté',      c: BLUE,     bg: 'rgba(255,255,255,0.04)',   border: 'rgba(255,255,255,0.07)'   },
   rejected : { l: 'Refusé',       c: T.red,    bg: 'rgba(255,255,255,0.05)',  border: 'rgba(255,255,255,0.14)'  },
   cancelled: { l: 'Désistement',  c: T.muted,  bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.10)'  },
 };
@@ -97,7 +97,7 @@ const fmt = (iso: string) =>
 const _NUM_P = 28;
 const _PCOLS = [
   '#1A9FE3', 'rgba(26,159,227,0.55)', '#1A9FE3', 'rgba(26,159,227,0.40)',
-  'rgba(255,255,255,0.28)', 'rgba(255,255,255,0.16)', 'rgba(26,159,227,0.22)',
+  'rgba(255,255,255,0.28)', 'rgba(255,255,255,0.16)', 'rgba(255,255,255,0.07)',
 ];
 const _PARTS = Array.from({ length: _NUM_P }, (_, i) => ({
   x:   (Math.sin(i * 2.39996) * 0.5 + 0.5) * 100,
@@ -518,7 +518,7 @@ const AppCard = memo(function AppCard({ app, index, onAccept, onReject, onChat, 
               <Text style={{ color: T.red, fontSize: 11, fontWeight: '700' }}>Refuser</Text>
             </TouchableOpacity>
             <TouchableOpacity style={ac.acceptBtn} onPress={onAccept} activeOpacity={0.85}>
-              <LinearGradient colors={['rgba(26,159,227,0.30)', 'rgba(26,159,227,0.14)']} style={ac.acceptGrad}>
+              <LinearGradient colors={['rgba(255,255,255,0.12)', 'rgba(26,159,227,0.14)']} style={ac.acceptGrad}>
                 <Ionicons name="checkmark" size={14} color={BLUE} />
                 <Text style={{ color: BLUE, fontSize: 12, fontWeight: '900' }}>Accepter</Text>
               </LinearGradient>
@@ -565,7 +565,7 @@ const ac = StyleSheet.create({
   eventIcon: { width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   eventTxt : { flex: 1, color: T.muted, fontSize: 11, fontWeight: '600' },
   avatar   : { width: 52, height: 52, borderRadius: 14, backgroundColor: T.navy },
-  avatarFb : { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(26,159,227,0.10)',
+  avatarFb : { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.04)',
     borderWidth: 1.5, borderColor: T.border },
   name     : { color: T.white, fontSize: 15, fontWeight: '900', letterSpacing: -0.3 },
   role     : { fontSize: 11, fontWeight: '700' },
@@ -888,7 +888,7 @@ export default function ApplicationsScreen() {
                     <TouchableOpacity key={k}
                       style={[ds.chip,
                         { backgroundColor: T.surf, borderColor: T.border },
-                        tab === k && { backgroundColor: 'rgba(26,159,227,0.12)', borderColor: T.borderHi }]}
+                        tab === k && { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: T.borderHi }]}
                       onPress={() => setTab(k)} activeOpacity={0.75}>
                       <Text style={[ds.chipTxt, { color: T.offWhite },
                         tab === k && { color: BLUE, fontWeight: '800' }]}>{l}</Text>
@@ -912,7 +912,7 @@ export default function ApplicationsScreen() {
                     <TouchableOpacity key={String(e.id)}
                       style={[ds.chip,
                         { backgroundColor: T.surf, borderColor: T.border },
-                        filterEvt === e.id && { backgroundColor: 'rgba(26,159,227,0.12)', borderColor: T.borderHi }]}
+                        filterEvt === e.id && { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: T.borderHi }]}
                       onPress={() => setFilterEvt(e.id)} activeOpacity={0.75}>
                       {e.id && <Ionicons name="calendar-outline" size={10} color={filterEvt === e.id ? BLUE : T.muted} />}
                       <Text style={[ds.chipTxt, { color: T.offWhite },
@@ -929,7 +929,7 @@ export default function ApplicationsScreen() {
                 {filtered.length === 0 ? (
                   <View style={{ alignItems: 'center', paddingTop: 72, gap: 14 }}>
                     <View style={{ width: 80, height: 80, borderRadius: 40,
-                      backgroundColor: 'rgba(26,159,227,0.10)',
+                      backgroundColor: 'rgba(255,255,255,0.04)',
                       alignItems: 'center', justifyContent: 'center',
                       borderWidth: 1, borderColor: T.borderHi }}>
                       <Ionicons
@@ -954,7 +954,7 @@ export default function ApplicationsScreen() {
                     {tab === 'all' && !search && (
                       <TouchableOpacity
                         style={{ paddingHorizontal: 22, paddingVertical: 12, borderRadius: 14,
-                          backgroundColor: 'rgba(26,159,227,0.12)', borderWidth: 1, borderColor: T.borderHi }}
+                          backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: T.borderHi }}
                         onPress={() => router.push('/(organizer)/create-event' as any)}>
                         <Text style={{ color: BLUE, fontWeight: '800', fontSize: 13 }}>+ Créer une mission</Text>
                       </TouchableOpacity>

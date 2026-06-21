@@ -5,7 +5,7 @@
  */
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated, Dimensions, FlatList, RefreshControl, ScrollView,
+  Animated, Dimensions, FlatList, Image, RefreshControl, ScrollView,
   StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { BlurView }        from 'expo-blur';
@@ -54,6 +54,7 @@ interface DashEvent {
   status: string;
   type: string | null;
   budget: number | null;
+  cover_url: string | null;
 }
 interface StaffMember {
   id: string;
@@ -92,6 +93,14 @@ interface Countdown {
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 const fmtDate   = (iso: string) => new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 const daysUntil = (iso: string) => Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000);
+
+function eventTypeIcon(type: string | null): string {
+  const map: Record<string, string> = {
+    Techno: 'flash-outline', House: 'musical-notes-outline', Rock: 'musical-note-outline',
+    Festival: 'ribbon-outline', Gala: 'sparkles-outline', Concert: 'musical-notes-outline',
+  };
+  return map[type ?? ''] ?? 'calendar-outline';
+}
 
 function generateInsights(
   events: DashEvent[],
@@ -171,16 +180,16 @@ function GlassCard({
   noBorder?: boolean;
 }) {
   const tintMap = {
-    blue:   ['rgba(26,159,227,0.20)', 'rgba(26,159,227,0.06)'],
+    blue:   ['rgba(255,255,255,0.09)', 'rgba(255,255,255,0.03)'],
     gold:   ['rgba(255,255,255,0.14)', 'rgba(255,255,255,0.04)'],
     white:  ['rgba(255,255,255,0.14)', 'rgba(255,255,255,0.03)'],
-    purple: ['rgba(26,159,227,0.18)', 'rgba(26,159,227,0.05)'],
+    purple: ['rgba(255,255,255,0.06)', 'rgba(26,159,227,0.05)'],
   } as const;
   const borderMap = {
-    blue:   'rgba(26,159,227,0.30)',
+    blue:   'rgba(255,255,255,0.12)',
     gold:   'rgba(255,255,255,0.20)',
     white:  'rgba(255,255,255,0.18)',
-    purple: 'rgba(26,159,227,0.28)',
+    purple: 'rgba(255,255,255,0.12)',
   };
   return (
     <View style={[{ borderRadius: radius, overflow: 'hidden' }, style]}>
@@ -208,7 +217,7 @@ function GlassCard({
 const NUM_P = 36;
 const PCOLS = [
   '#1A9FE3', 'rgba(26,159,227,0.55)', '#1A9FE3', 'rgba(26,159,227,0.45)',
-  'rgba(255,255,255,0.30)', 'rgba(255,255,255,0.18)', 'rgba(26,159,227,0.25)',
+  'rgba(255,255,255,0.30)', 'rgba(255,255,255,0.18)', 'rgba(255,255,255,0.10)',
 ];
 const PARTS = Array.from({ length: NUM_P }, (_, i) => ({
   x:   (Math.sin(i * 2.39996) * 0.5 + 0.5) * 100,
@@ -246,7 +255,7 @@ function ParticleBg() {
       />
       <View style={{
         position: 'absolute', top: '8%', left: '-20%', right: '-20%', height: '55%',
-        backgroundColor: 'rgba(26,159,227,0.04)', borderRadius: 999,
+        backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 999,
       }}/>
       {PARTS.map((p, i) => {
         const opacity = anims[i].interpolate({ inputRange: [0, 1], outputRange: [0.12, p.shadow ? 0.85 : 0.55] });
@@ -340,7 +349,15 @@ const StaffMiniCard = memo(({ member }: { member: StaffMember }) => (
   <GlassCard tint="white" radius={14} style={{ width: 110, marginRight: 10 }}>
     <View style={{ padding: 12, alignItems: 'center', gap: 8 }}>
       <View style={{ position: 'relative' }}>
-        <Avatar name={member.display_name} size={40}/>
+        {member.avatar_url ? (
+          <Image source={{ uri: member.avatar_url }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+        ) : (
+          <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ color: WHITE, fontWeight: '700', fontSize: 16 }}>
+              {member.display_name.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        )}
         <View style={{
           position: 'absolute', bottom: 0, right: 0,
           width: 11, height: 11, borderRadius: 5.5,
@@ -369,6 +386,18 @@ const EventRowCard = memo(({ evt, onPress }: { evt: DashEvent; onPress: () => vo
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.82} style={{ marginBottom: 10 }}>
       <GlassCard tint="white" radius={14} style={{ borderLeftWidth: 3, borderLeftColor: tc }}>
+        {/* Cover image */}
+        {evt.cover_url ? (
+          <Image
+            source={{ uri: evt.cover_url }}
+            style={{ width: '100%', height: 80, borderRadius: 12 }}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={{ width: '100%', height: 80, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.04)', alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name={eventTypeIcon(evt.type) as any} size={28} color="rgba(255,255,255,0.25)" />
+          </View>
+        )}
         <View style={{ padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <View style={{
             width: 36, height: 36, borderRadius: 10,
@@ -391,7 +420,7 @@ const EventRowCard = memo(({ evt, onPress }: { evt: DashEvent; onPress: () => vo
           </View>
           <View style={{
             paddingHorizontal: 8, paddingVertical: 3, borderRadius: 7,
-            backgroundColor: evt.status === 'published' ? 'rgba(26,159,227,0.15)' : 'rgba(255,255,255,0.08)',
+            backgroundColor: evt.status === 'published' ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.08)',
           }}>
             <Text style={{
               color: evt.status === 'published' ? SUCCESS : WARNING,
@@ -416,7 +445,7 @@ const SectionHeader = memo(({
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
       <Text style={{ fontSize: 16, fontWeight: '800', color: WHITE }}>{title}</Text>
       {count != null && count > 0 && (
-        <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, backgroundColor: 'rgba(26,159,227,0.15)' }}>
+        <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.05)' }}>
           <Text style={{ color: BLUE, fontSize: 11, fontWeight: '800' }}>{count}</Text>
         </View>
       )}
@@ -443,7 +472,7 @@ const Skeleton = memo(() => {
   }, []);
   const op = a.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.7] });
   const B = ({ w, h, r = 8 }: { w: number | `${number}%`; h: number; r?: number }) => (
-    <Animated.View style={{ width: w as any, height: h, borderRadius: r, backgroundColor: 'rgba(26,159,227,0.12)', opacity: op }}/>
+    <Animated.View style={{ width: w as any, height: h, borderRadius: r, backgroundColor: 'rgba(255,255,255,0.05)', opacity: op }}/>
   );
   return (
     <View style={{ gap: 20, paddingHorizontal: EDGE }}>
@@ -527,7 +556,7 @@ export default function Dashboard() {
 
       const [orgRes, eventsRes, staffRes] = await Promise.all([
         supabase.from('organizers').select('display_name,company_name,avatar_url').eq('id', id).maybeSingle(),
-        supabase.from('events').select('id,title,date_start,location,status,type,budget').eq('organizer_id', id).order('date_start', { ascending: false }).limit(50),
+        supabase.from('events').select('id,title,date_start,location,status,type,budget,cover_url').eq('organizer_id', id).order('date_start', { ascending: false }).limit(50),
         supabase.from('staff').select('id,display_name,avatar_url,is_available,rating').order('display_name').limit(20),
       ]);
 
@@ -573,9 +602,15 @@ export default function Dashboard() {
   useEffect(() => {
     if (!orgId) return;
     let alive = true;
+    const topic = `dashboard_rt_${orgId}`;
+
+    // Purge any stale channel with same topic before creating a new one
+    supabase.getChannels()
+      .filter(c => c.topic === `realtime:${topic}`)
+      .forEach(c => supabase.removeChannel(c));
 
     const ch = supabase
-      .channel(`dashboard_rt_${orgId}`)
+      .channel(topic)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'missions' },     () => { if (alive) fetchData(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'applications' }, () => { if (alive) fetchData(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'events' },       () => { if (alive) fetchData(); })
@@ -588,7 +623,10 @@ export default function Dashboard() {
       supabase.removeChannel(ch);
       setLiveActive(false);
     };
-  }, [orgId, fetchData]);
+  // fetchData excluded intentionally — it changes on every orgId update and would
+  // cause the channel to teardown/rebuild repeatedly, triggering the same error.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgId]);
 
   /* ── AI insight cycle ────────────────────────────────────────────────────── */
   useEffect(() => {
@@ -738,7 +776,7 @@ export default function Dashboard() {
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <View style={{
                         width: 32, height: 32, borderRadius: 10,
-                        backgroundColor: 'rgba(26,159,227,0.20)',
+                        backgroundColor: 'rgba(255,255,255,0.09)',
                         alignItems: 'center', justifyContent: 'center',
                       }}>
                         <Ionicons name="flash-outline" size={16} color={BLUE}/>
@@ -747,9 +785,9 @@ export default function Dashboard() {
                     </View>
                     <View style={{
                       flexDirection: 'row', alignItems: 'center', gap: 4,
-                      backgroundColor: 'rgba(26,159,227,0.15)',
+                      backgroundColor: 'rgba(255,255,255,0.05)',
                       paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
-                      borderWidth: 1, borderColor: 'rgba(26,159,227,0.30)',
+                      borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
                     }}>
                       <Animated.View style={{
                         width: 6, height: 6, borderRadius: 3,
@@ -817,7 +855,7 @@ export default function Dashboard() {
                       <Text style={{ color: SUCCESS, fontSize: 11, fontWeight: '700' }}>Approuver</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.quickAction, { borderColor: 'rgba(26,159,227,0.28)' }]}
+                      style={[styles.quickAction, { borderColor: 'rgba(255,255,255,0.12)' }]}
                       onPress={() => router.push('/(organizer)/missions' as any)}
                       activeOpacity={0.82}
                     >
@@ -825,7 +863,7 @@ export default function Dashboard() {
                       <Text style={{ color: PURPLE, fontSize: 11, fontWeight: '700' }}>Missions</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.quickAction, { borderColor: 'rgba(26,159,227,0.30)', flex: 1 }]}
+                      style={[styles.quickAction, { borderColor: 'rgba(255,255,255,0.12)', flex: 1 }]}
                       onPress={() => router.push('/(organizer)/create-event' as any)}
                       activeOpacity={0.82}
                     >
@@ -846,7 +884,7 @@ export default function Dashboard() {
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                       <View style={{
                         width: 38, height: 38, borderRadius: 11,
-                        backgroundColor: 'rgba(26,159,227,0.20)',
+                        backgroundColor: 'rgba(255,255,255,0.09)',
                         alignItems: 'center', justifyContent: 'center',
                       }}>
                         <Ionicons name="time-outline" size={18} color={BLUE}/>
@@ -991,7 +1029,7 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(26,159,227,0.30)',
+    borderColor: 'rgba(255,255,255,0.12)',
     backgroundColor: 'rgba(255,255,255,0.04)',
   },
   quickBadge: {

@@ -1,23 +1,38 @@
-const { getDefaultConfig } = require("expo/metro-config");
+const { getDefaultConfig } = require('expo/metro-config');
+const path = require('path');
 
 /** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname, {
-  // Indispensable pour Expo Router et le support Web
+  // Required for Expo Router web support
   isStandardEngine: true,
 });
 
-// Ensure 'web' is included in the platform list so that .web.ts / .web.js
-// stubs are resolved before their generic counterparts.
-// This is necessary for modules like expo-notifications that crash on web.
+// Ensure 'web' is resolved before generic files (needed for expo-notifications etc.)
 config.resolver = {
   ...config.resolver,
   platforms: ['ios', 'android', 'web', 'native'],
+  resolverMainFields: ['react-native', 'browser', 'main'],
 };
 
-// Sur Netlify, on évite le cache disque personnalisé qui peut causer des erreurs de module
+// Web shims — route native-only packages to safe stubs when bundling for web
+const WEB_SHIMS = {
+  'react-native-maps': path.resolve(__dirname, 'shims/react-native-maps.js'),
+};
+
+const originalResolveRequest = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (platform === 'web' && WEB_SHIMS[moduleName]) {
+    return { filePath: WEB_SHIMS[moduleName], type: 'sourceFile' };
+  }
+  if (originalResolveRequest) {
+    return originalResolveRequest(context, moduleName, platform);
+  }
+  return context.resolveRequest(context, moduleName, platform);
+};
+
 if (process.env.NETLIFY) {
   config.cacheStores = [];
-  config.maxWorkers = 1; // Netlify a des ressources limitées, 1 worker évite les crashs mémoire
+  config.maxWorkers = 1;
 } else {
   config.maxWorkers = 2;
 }

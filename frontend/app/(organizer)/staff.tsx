@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { LinearGradient }  from 'expo-linear-gradient';
 import { Ionicons }        from '@expo/vector-icons';
+import { StatusBar }       from 'expo-status-bar';
 import { SafeAreaView }    from 'react-native-safe-area-context';
 import { useRouter }       from 'expo-router';
 import { supabase }        from '@/lib/supabase';
@@ -34,8 +35,8 @@ const T = {
   faint   : FAINT,
   surf    : 'rgba(255,255,255,0.045)',
   surfHi  : 'rgba(255,255,255,0.09)',
-  border  : 'rgba(26,159,227,0.12)',
-  borderHi: 'rgba(26,159,227,0.30)',
+  border  : 'rgba(255,255,255,0.05)',
+  borderHi: 'rgba(255,255,255,0.12)',
   navy    : NAVY,
   amber   : 'rgba(255,255,255,0.65)',
   red     : 'rgba(255,255,255,0.45)',
@@ -52,7 +53,7 @@ const PTS   = Array.from({ length: 18 }, (_, i) => ({
 const ParticleBg = memo(() => (
   <View style={StyleSheet.absoluteFill} pointerEvents="none">
     <LinearGradient colors={[BG, '#091628', BG]} style={StyleSheet.absoluteFill}/>
-    <View style={{ position: 'absolute', top: '6%', left: '12%', width: SW * 0.7, height: SW * 0.7, borderRadius: SW * 0.35, backgroundColor: 'rgba(26,159,227,0.025)' }}/>
+    <View style={{ position: 'absolute', top: '6%', left: '12%', width: SW * 0.7, height: SW * 0.7, borderRadius: SW * 0.35, backgroundColor: 'rgba(255,255,255,0.015)' }}/>
     <View style={{ position: 'absolute', bottom: '8%', right: '-18%', width: SW * 0.6, height: SW * 0.6, borderRadius: SW * 0.3, backgroundColor: 'rgba(56,189,248,0.02)' }}/>
     {PTS.map(p => <View key={p.id} style={{ position: 'absolute', left: p.x, top: p.y, width: p.sz, height: p.sz, borderRadius: p.sz / 2, backgroundColor: p.col, opacity: p.op }}/>)}
   </View>
@@ -137,10 +138,12 @@ const StaffProfileModal = memo(function StaffProfileModal({
       visible={visible}
       animationType="slide"
       transparent
+      hardwareAccelerated
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <View style={ms.overlay}>
+      <View style={{ flex: 1, backgroundColor: '#050E1B' }}>
+        <StatusBar style="light" />
         {/* Tap outside to close */}
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose}/>
 
@@ -150,12 +153,12 @@ const StaffProfileModal = memo(function StaffProfileModal({
             style={StyleSheet.absoluteFillObject}
           />
           {/* Blue glow accent at top */}
-          <View style={{ position: 'absolute', top: 0, left: SW * 0.2, width: SW * 0.6, height: 120, borderRadius: 60, backgroundColor: 'rgba(26,159,227,0.06)' }} pointerEvents="none"/>
+          <View style={{ position: 'absolute', top: 0, left: SW * 0.2, width: SW * 0.6, height: 120, borderRadius: 60, backgroundColor: 'rgba(255,255,255,0.03)' }} pointerEvents="none"/>
 
           <ScrollView
             showsVerticalScrollIndicator={false}
             style={{ flex: 1, backgroundColor: '#050E1B' }}
-            contentContainerStyle={{ flexGrow: 1, backgroundColor: '#050E1B', paddingBottom: 40 }}
+            contentContainerStyle={{ flexGrow: 1, backgroundColor: '#050E1B', paddingBottom: 60 }}
             bounces={false}
           >
             {/* Close button */}
@@ -174,7 +177,7 @@ const StaffProfileModal = memo(function StaffProfileModal({
                 />
               ) : (
                 <View style={{ borderWidth: 2, borderColor: BLUE, borderRadius: 44, padding: 2 }}>
-                  <Avatar name={staff.display_name} size={80} bg="rgba(26,159,227,0.18)"/>
+                  <Avatar name={staff.display_name} size={80} bg="rgba(255,255,255,0.06)"/>
                 </View>
               )}
 
@@ -187,9 +190,9 @@ const StaffProfileModal = memo(function StaffProfileModal({
                 <View style={{
                   flexDirection: 'row', alignItems: 'center', gap: 6,
                   paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
-                  backgroundColor: isAvailable ? 'rgba(26,159,227,0.12)' : 'rgba(255,255,255,0.06)',
+                  backgroundColor: isAvailable ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.06)',
                   borderWidth: 1,
-                  borderColor: isAvailable ? 'rgba(26,159,227,0.30)' : 'rgba(255,255,255,0.1)',
+                  borderColor: isAvailable ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.1)',
                 }}>
                   <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: isAvailable ? SUCCESS : MUTED }}/>
                   <Text style={{ fontSize: 12, fontWeight: '600', color: isAvailable ? SUCCESS : MUTED }}>
@@ -208,8 +211,8 @@ const StaffProfileModal = memo(function StaffProfileModal({
                 {roles.map((r, i) => (
                   <View key={i} style={{
                     paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20,
-                    backgroundColor: 'rgba(26,159,227,0.12)',
-                    borderWidth: 1, borderColor: 'rgba(26,159,227,0.30)',
+                    backgroundColor: 'rgba(255,255,255,0.05)',
+                    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
                   }}>
                     <Text style={{ color: BLUE, fontSize: 12, fontWeight: '600' }}>{r}</Text>
                   </View>
@@ -284,7 +287,7 @@ const StaffProfileModal = memo(function StaffProfileModal({
           </ScrollView>
 
           {/* Top border accent */}
-          <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(26,159,227,0.25)' }}/>
+          <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.10)' }}/>
         </View>
       </View>
     </Modal>
@@ -295,12 +298,12 @@ const ms = StyleSheet.create({
   overlay    : { flex: 1, backgroundColor: 'rgba(5,14,27,0.85)', justifyContent: 'flex-end' },
   sheet      : { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden', maxHeight: '90%', backgroundColor: NAVY },
   closeBtn   : { position: 'absolute', top: 16, right: 18, zIndex: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: FAINT, alignItems: 'center', justifyContent: 'center' },
-  statsRow   : { flexDirection: 'row', marginHorizontal: EDGE, borderRadius: 16, backgroundColor: FAINT, paddingVertical: 18, borderWidth: 1, borderColor: 'rgba(26,159,227,0.10)' },
+  statsRow   : { flexDirection: 'row', marginHorizontal: EDGE, borderRadius: 16, backgroundColor: FAINT, paddingVertical: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)' },
   statItem   : { flex: 1, alignItems: 'center', gap: 4 },
   statValue  : { fontSize: 20, fontWeight: '800', color: WHITE },
   statLabel  : { fontSize: 11, color: MUTED, fontWeight: '500' },
   statDivider: { width: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.10)' },
-  bioBox     : { marginHorizontal: EDGE, marginTop: 20, padding: 16, borderRadius: 14, backgroundColor: FAINT, borderWidth: 1, borderColor: 'rgba(26,159,227,0.10)', gap: 8 },
+  bioBox     : { marginHorizontal: EDGE, marginTop: 20, padding: 16, borderRadius: 14, backgroundColor: FAINT, borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)', gap: 8 },
   bioLabel   : { fontSize: 11, fontWeight: '700', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8 },
   bioText    : { fontSize: 13, color: 'rgba(255,255,255,0.88)', lineHeight: 20 },
 });
@@ -351,7 +354,7 @@ const StaffCard = memo(function StaffCard({ staff, index, onPress }: {
               onError={() => setImgErr(true)}
             />
           ) : (
-            <Avatar name={staff.display_name} size={52} bg="rgba(26,159,227,0.18)"/>
+            <Avatar name={staff.display_name} size={52} bg="rgba(255,255,255,0.06)"/>
           )}
 
           <View style={{ flex: 1, gap: 4 }}>
@@ -368,7 +371,7 @@ const StaffCard = memo(function StaffCard({ staff, index, onPress }: {
             {roles.length > 0 && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ backgroundColor: '#050E1B', flexGrow: 1, gap: 5, flexDirection: 'row' }} style={{ backgroundColor: '#050E1B' }}>
                 {roles.slice(0, 3).map((r, i) => (
-                  <View key={i} style={[sc.tag, { backgroundColor: 'rgba(26,159,227,0.12)', borderColor: T.borderHi }]}>
+                  <View key={i} style={[sc.tag, { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: T.borderHi }]}>
                     <Text style={[sc.tagTxt, { color: BLUE }]}>{r}</Text>
                   </View>
                 ))}
@@ -463,7 +466,7 @@ const EngagedCard = memo(function EngagedCard({ staff, index, onPress }: {
           {staff.avatar_url && !imgErr ? (
             <Image source={{ uri: staff.avatar_url }} style={ec.avatar} resizeMode="cover" onError={() => setImgErr(true)}/>
           ) : (
-            <Avatar name={staff.display_name} size={46} bg="rgba(26,159,227,0.18)"/>
+            <Avatar name={staff.display_name} size={46} bg="rgba(255,255,255,0.06)"/>
           )}
           <View style={{ flex: 1, gap: 3 }}>
             <Text style={[ec.name, { color: WHITE }]} numberOfLines={1}>{staff.display_name}</Text>
@@ -742,7 +745,7 @@ export default function StaffScreen() {
                 {count > 0 && (
                   <View style={{
                     borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1,
-                    backgroundColor: tab === key ? 'rgba(26,159,227,0.12)' : T.surf,
+                    backgroundColor: tab === key ? 'rgba(255,255,255,0.05)' : T.surf,
                   }}>
                     <Text style={{ fontSize: 10, fontWeight: '700', color: tab === key ? BLUE : MUTED }}>
                       {count}
@@ -772,7 +775,7 @@ export default function StaffScreen() {
               <View style={{ alignItems: 'center', paddingTop: 80, gap: 16 }}>
                 <View style={{
                   width: 72, height: 72, borderRadius: 36,
-                  backgroundColor: 'rgba(26,159,227,0.12)',
+                  backgroundColor: 'rgba(255,255,255,0.05)',
                   alignItems: 'center', justifyContent: 'center',
                   borderWidth: 1, borderColor: T.border,
                 }}>

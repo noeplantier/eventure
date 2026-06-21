@@ -102,7 +102,7 @@ const TabItem = memo(function TabItem({
             <View style={StyleSheet.absoluteFill}>
               <BlurView intensity={30} tint="dark" style={[StyleSheet.absoluteFill, { borderRadius: 22 }]} />
               <LinearGradient
-                colors={['rgba(26,159,227,0.45)', 'rgba(26,159,227,0.18)']}
+                colors={['rgba(26,159,227,0.45)', 'rgba(255,255,255,0.06)']}
                 style={[StyleSheet.absoluteFill, { borderRadius: 22 }]}
               />
               <View style={[StyleSheet.absoluteFill, {
@@ -213,7 +213,7 @@ function CustomNavBarInner() {
         {/* Blue bottom glow */}
         <View style={{
           position: 'absolute', bottom: -8, left: '20%', right: '20%', height: 16,
-          backgroundColor: 'rgba(26,159,227,0.25)', borderRadius: 8,
+          backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: 8,
           shadowColor: BLUE, shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 0 },
         }} />
         {/* Tabs */}

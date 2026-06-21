@@ -18,13 +18,13 @@ interface GlassCardProps {
 }
 
 const TINT_COLORS: Record<string, [string, string, string]> = {
-  blue:  ['rgba(26,159,227,0.18)', 'rgba(26,159,227,0.06)', 'rgba(26,159,227,0.02)'],
+  blue:  ['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.03)', 'rgba(26,159,227,0.02)'],
   white: ['rgba(255,255,255,0.14)', 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0.01)'],
   gold:  ['rgba(255,255,255,0.10)',  'rgba(255,255,255,0.04)',  'rgba(245,200,66,0.01)'],
 };
 
 const BORDER_COLORS: Record<string, string> = {
-  blue:  'rgba(26,159,227,0.28)',
+  blue:  'rgba(255,255,255,0.12)',
   white: 'rgba(255,255,255,0.18)',
   gold:  'rgba(255,255,255,0.16)',
 };

@@ -1,12 +1,12 @@
 /**
  * app/(organizer)/events.tsx — EVENTURE v3 · Liste des Événements
- * Dark futuristic theme — gradient covers, filter chips, stats row
+ * Dark futuristic theme — gradient covers, filter chips, stats row, map view
  */
 import React, {
   memo, useCallback, useEffect, useRef, useState,
 } from 'react';
 import {
-  Animated, FlatList, Platform, RefreshControl,
+  Animated, FlatList, Image, Platform, RefreshControl,
   ScrollView, StatusBar, StyleSheet,
   Text, TouchableOpacity, View,
 } from 'react-native';
@@ -14,6 +14,12 @@ import { LinearGradient }            from 'expo-linear-gradient';
 import { Ionicons }                  from '@expo/vector-icons';
 import { useSafeAreaInsets }         from 'react-native-safe-area-context';
 import { useRouter }                 from 'expo-router';
+// react-native-maps is native-only — lazy require prevents web bundle crash
+const RNMaps = Platform.OS !== 'web' ? require('react-native-maps') : null;
+const MapView: any         = RNMaps?.default ?? View;
+const Marker: any          = RNMaps?.Marker ?? (() => null);
+const PROVIDER_DEFAULT: any = RNMaps?.PROVIDER_DEFAULT ?? null;
+import * as Location from 'expo-location';
 import { supabase }                  from '@/lib/supabase';
 import { getWorkingOrganizerId }     from '@/lib/mockUser';
 
@@ -25,6 +31,18 @@ const WHITE = '#FFFFFF';
 const MUTED = 'rgba(255,255,255,0.55)';
 const FAINT = 'rgba(255,255,255,0.08)';
 const EDGE  = 18;
+
+/* ─── Map style ──────────────────────────────────────────────────────────── */
+const mapStyle = [
+  { elementType: 'geometry', stylers: [{ color: '#0A1628' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#8BAFC9' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#050E1B' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#0C2A4A' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#0A1628' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#050E1B' }] },
+  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+];
 
 /* ─── Event-type colours (gradient covers) — 2 blues + white only ────────── */
 const TYPE_COLORS: Record<string, [string, string]> = {
@@ -48,9 +66,9 @@ const TYPE_ICONS: Record<string, React.ComponentProps<typeof Ionicons>['name']> 
 
 /* ─── Status badge config (blanc + bleu uniquement) ─────────────────────── */
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  published : { label: 'PUBLIÉ',    color: WHITE,                    bg: 'rgba(26,159,227,0.22)' },
+  published : { label: 'PUBLIÉ',    color: WHITE,                    bg: 'rgba(255,255,255,0.07)' },
   draft     : { label: 'BROUILLON', color: 'rgba(255,255,255,0.45)', bg: 'rgba(255,255,255,0.07)' },
-  ongoing   : { label: 'EN COURS',  color: WHITE,                    bg: 'rgba(26,159,227,0.18)' },
+  ongoing   : { label: 'EN COURS',  color: WHITE,                    bg: 'rgba(255,255,255,0.06)' },
   completed : { label: 'TERMINÉ',   color: 'rgba(255,255,255,0.60)', bg: 'rgba(255,255,255,0.08)' },
   cancelled : { label: 'ANNULÉ',    color: 'rgba(255,255,255,0.35)', bg: 'rgba(255,255,255,0.05)' },
 };
@@ -73,6 +91,8 @@ interface Event {
   description: string;
   status: EventStatus;
   cover_url: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 /* ─── Helpers ─────────────────────────────────────────────────────────────── */
@@ -190,14 +210,24 @@ const EventCard = memo(function EventCard({ event, onEdit, onView }: EventCardPr
     <View style={ec.card}>
       {/* ── Banner ── */}
       <View style={ec.banner}>
-        <LinearGradient
-          colors={colors}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-        {/* Type icon */}
-        <Ionicons name={iconName} size={40} color="white" style={ec.typeIcon}/>
+        {event.cover_url ? (
+          <Image
+            source={{ uri: event.cover_url }}
+            style={[StyleSheet.absoluteFill, { borderRadius: 0 }]}
+            resizeMode="cover"
+          />
+        ) : (
+          <LinearGradient
+            colors={colors}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        )}
+        {/* Type icon — only when no cover image */}
+        {!event.cover_url && (
+          <Ionicons name={iconName} size={40} color="white" style={ec.typeIcon}/>
+        )}
         {/* Status badge */}
         <View style={[ec.statusBadge, { backgroundColor: status.bg }]}>
           <Text style={[ec.statusText, { color: status.color }]}>{status.label}</Text>
@@ -226,7 +256,7 @@ const EventCard = memo(function EventCard({ event, onEdit, onView }: EventCardPr
           <Text style={ec.budget}>{formatBudget(event.budget ?? 0)}</Text>
           <View style={ec.actions}>
             <TouchableOpacity
-              style={[ec.actionBtn, { borderColor: 'rgba(26,159,227,0.3)', backgroundColor: 'rgba(26,159,227,0.08)' }]}
+              style={[ec.actionBtn, { borderColor: 'rgba(26,159,227,0.3)', backgroundColor: 'rgba(255,255,255,0.04)' }]}
               onPress={() => onEdit(event.id)}
               activeOpacity={0.75}
             >
@@ -234,7 +264,7 @@ const EventCard = memo(function EventCard({ event, onEdit, onView }: EventCardPr
               <Text style={[ec.actionText, { color: BLUE }]}>Modifier</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[ec.actionBtn, { borderColor: 'rgba(26,159,227,0.3)', backgroundColor: 'rgba(26,159,227,0.08)' }]}
+              style={[ec.actionBtn, { borderColor: 'rgba(26,159,227,0.3)', backgroundColor: 'rgba(255,255,255,0.04)' }]}
               onPress={() => onView(event.id)}
               activeOpacity={0.75}
             >
@@ -346,11 +376,32 @@ export default function EventsScreen() {
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
 
-  const [events,     setEvents]     = useState<Event[]>([]);
-  const [loading,    setLoading]    = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [filter,     setFilter]     = useState('Tous');
-  const [totalSlots, setTotalSlots] = useState(0);
+  const [events,        setEvents]        = useState<Event[]>([]);
+  const [loading,       setLoading]       = useState(true);
+  const [refreshing,    setRefreshing]    = useState(false);
+  const [filter,        setFilter]        = useState('Tous');
+  const [totalSlots,    setTotalSlots]    = useState(0);
+  const [viewMode,      setViewMode]      = useState<'list' | 'map'>('list');
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [userRegion,    setUserRegion]    = useState({
+    latitude: 48.8566, longitude: 2.3522, latitudeDelta: 0.08, longitudeDelta: 0.08,
+  });
+
+  /* ── Location permission ── */
+  useEffect(() => {
+    Location.requestForegroundPermissionsAsync().then(({ status }) => {
+      if (status === 'granted') {
+        Location.getCurrentPositionAsync({}).then(loc => {
+          setUserRegion({
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          });
+        }).catch(() => {});
+      }
+    });
+  }, []);
 
   /* ── Fetch ── */
   const load = useCallback(async (silent = false) => {
@@ -410,12 +461,48 @@ export default function EventsScreen() {
   }, [router]);
 
   const handleView = useCallback((id: string) => {
-    router.push({ pathname: '/(organizer)/create-event' as any, params: { eventId: id, view: '1' } });
+    router.push({ pathname: '/(organizer)/event/[id]', params: { id } } as any);
   }, [router]);
 
-  /* ── List header (filter chips + stats) ── */
+  /* ── View mode toggle ── */
+  const ViewToggle = (
+    <View style={{
+      flexDirection: 'row', marginHorizontal: EDGE, marginBottom: 12,
+      backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 14, padding: 3, gap: 0,
+    }}>
+      {(['list', 'map'] as const).map(mode => (
+        <TouchableOpacity
+          key={mode}
+          onPress={() => setViewMode(mode)}
+          style={{
+            flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+            paddingVertical: 8, borderRadius: 12, gap: 6,
+            backgroundColor: viewMode === mode ? BLUE : 'transparent',
+          }}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name={mode === 'list' ? 'list-outline' : 'map-outline'}
+            size={15}
+            color={viewMode === mode ? 'white' : 'rgba(255,255,255,0.45)'}
+          />
+          <Text style={{
+            color: viewMode === mode ? 'white' : 'rgba(255,255,255,0.45)',
+            fontSize: 13, fontWeight: '600',
+          }}>
+            {mode === 'list' ? 'Liste' : 'Carte'}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+
+  /* ── List header (view toggle + filter chips + stats) ── */
   const ListHeader = (
     <>
+      {/* View mode toggle */}
+      {ViewToggle}
+
       {/* Filter bar */}
       <ScrollView
         horizontal
@@ -452,6 +539,41 @@ export default function EventsScreen() {
     </>
   );
 
+  /* ── Map header (view toggle + filter chips only, no stats) ── */
+  const MapHeader = (
+    <>
+      {/* View mode toggle */}
+      {ViewToggle}
+
+      {/* Filter bar */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ backgroundColor: '#050E1B', flexGrow: 1, paddingHorizontal: EDGE, gap: 8, paddingBottom: 14 }}
+        style={{ backgroundColor: '#050E1B', marginBottom: 4 }}
+      >
+        {FILTERS.map(f => {
+          const active = filter === f;
+          return (
+            <TouchableOpacity
+              key={f}
+              style={[
+                fc.chip,
+                active
+                  ? { backgroundColor: BLUE }
+                  : { backgroundColor: FAINT },
+              ]}
+              onPress={() => setFilter(f)}
+              activeOpacity={0.75}
+            >
+              <Text style={[fc.chipText, { color: active ? WHITE : MUTED }]}>{f}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </>
+  );
+
   return (
     <View style={{ flex: 1, backgroundColor: BG }}>
       <StatusBar barStyle="light-content" backgroundColor={BG}/>
@@ -479,7 +601,86 @@ export default function EventsScreen() {
       {/* ── Content ── */}
       {loading ? (
         <View style={{ paddingTop: 16 }}>
+          <View style={{ paddingTop: 14 }}>
+            {ViewToggle}
+          </View>
           {[0, 1, 2].map(i => <SkeletonCard key={i}/>)}
+        </View>
+      ) : viewMode === 'map' ? (
+        <View style={{ flex: 1, backgroundColor: BG }}>
+          {/* Map header controls */}
+          <View style={{ paddingTop: 14, backgroundColor: BG }}>
+            {MapHeader}
+          </View>
+
+          {/* Map */}
+          <View style={{ flex: 1, backgroundColor: BG }}>
+            <MapView
+              style={{ flex: 1 }}
+              provider={PROVIDER_DEFAULT}
+              initialRegion={userRegion}
+              region={userRegion}
+              userInterfaceStyle="dark"
+              customMapStyle={mapStyle}
+              showsUserLocation
+              showsCompass={false}
+              showsScale={false}
+            >
+              {filtered.filter(e => e.latitude && e.longitude).map(event => (
+                <Marker
+                  key={event.id}
+                  coordinate={{ latitude: event.latitude!, longitude: event.longitude! }}
+                  onPress={() => setSelectedEvent(event)}
+                >
+                  <View style={{
+                    width: 36, height: 36, borderRadius: 18,
+                    backgroundColor: BLUE,
+                    alignItems: 'center', justifyContent: 'center',
+                    borderWidth: 2, borderColor: 'white',
+                    shadowColor: BLUE, shadowOpacity: 0.8, shadowRadius: 8,
+                  }}>
+                    <Ionicons name="musical-notes-outline" size={16} color="white" />
+                  </View>
+                </Marker>
+              ))}
+            </MapView>
+
+            {/* Selected event bottom sheet */}
+            {selectedEvent && (
+              <View style={{
+                position: 'absolute', bottom: 0, left: 0, right: 0,
+                backgroundColor: 'rgba(5,14,27,0.95)',
+                borderTopLeftRadius: 24, borderTopRightRadius: 24,
+                borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+                padding: 20, paddingBottom: insets.bottom + 24,
+              }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <Text style={{ color: WHITE, fontSize: 18, fontWeight: '700', flex: 1 }} numberOfLines={1}>
+                    {selectedEvent.title}
+                  </Text>
+                  <TouchableOpacity onPress={() => setSelectedEvent(null)}>
+                    <Ionicons name="close-circle" size={24} color="rgba(255,255,255,0.4)" />
+                  </TouchableOpacity>
+                </View>
+                <Text style={{ color: MUTED, fontSize: 13, marginBottom: 4 }}>
+                  {selectedEvent.location}
+                </Text>
+                <Text style={{ color: BLUE, fontSize: 12, fontWeight: '600' }}>
+                  {new Date(selectedEvent.date_start).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => router.push({ pathname: '/(organizer)/event/[id]', params: { id: selectedEvent.id } } as any)}
+                  style={{
+                    marginTop: 16, backgroundColor: BLUE, borderRadius: 14,
+                    padding: 14, alignItems: 'center',
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ color: WHITE, fontWeight: '700', fontSize: 15 }}>Voir les détails</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
         </View>
       ) : (
         <FlatList
@@ -515,7 +716,7 @@ export default function EventsScreen() {
 const ds = StyleSheet.create({
   topBar   : { paddingHorizontal: EDGE, paddingBottom: 14,
                borderBottomWidth: StyleSheet.hairlineWidth,
-               borderBottomColor: 'rgba(26,159,227,0.12)',
+               borderBottomColor: 'rgba(255,255,255,0.05)',
                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                zIndex: 10 },
   pageTitle: { fontSize: 28, fontWeight: '900', color: WHITE, letterSpacing: -0.5 },

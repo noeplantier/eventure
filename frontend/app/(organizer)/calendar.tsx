@@ -1,7 +1,7 @@
 /**
- * app/(organizer)/calendar.tsx — EVENTURE v3 · Dark Green
+ * app/(organizer)/calendar.tsx — EVENTURE v3 · Indigo Dark
  *
- * Palette : #020A06 bg · #00D97E primary · #F5C842 gold
+ * Palette : #050E1B bg · #1A9FE3 primary · #FFFFFF text
  */
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -11,13 +11,14 @@ import {
 import { LinearGradient }  from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons }        from '@expo/vector-icons';
+import { Calendar } from 'react-native-calendars';
 import { SafeAreaView }    from 'react-native-safe-area-context';
 import { useRouter }       from 'expo-router';
 import { supabase }        from '@/lib/supabase';
 import { getWorkingUid }   from '@/lib/mockUser';
 import { useInteractiveBg } from '@/components/InteractiveBg';
 
-/* ─── Palette — Dark Green ───────────────────────────────────────────────── */
+/* ─── Palette — Indigo Dark ─────────────────────────────────────────────── */
 const { width: SW } = Dimensions.get('window');
 const BG    = '#050E1B';
 const BLUE = '#1A9FE3';
@@ -31,8 +32,8 @@ const T = {
   faint   : 'rgba(255,255,255,0.18)',
   surf    : 'rgba(255,255,255,0.045)',
   surfHi  : 'rgba(255,255,255,0.09)',
-  border  : 'rgba(26,159,227,0.12)',
-  borderHi: 'rgba(26,159,227,0.30)',
+  border  : 'rgba(255,255,255,0.05)',
+  borderHi: 'rgba(255,255,255,0.12)',
   navy    : '#0C1A30',
   amber   : 'rgba(255,255,255,0.65)',
   red     : 'rgba(255,255,255,0.45)',
@@ -51,6 +52,23 @@ const TYPE_COLORS: Record<string, string> = {
   Mariage: '#1A9FE3', Séminaire: PURPLE, Concert: DANGER, Sport: SUCCESS,
 };
 const typeColor = (t: string | null) => TYPE_COLORS[t ?? ''] ?? BLUE;
+
+const CAL_THEME = {
+  backgroundColor: 'transparent',
+  calendarBackground: 'transparent',
+  textSectionTitleColor: 'rgba(255,255,255,0.45)',
+  selectedDayBackgroundColor: '#1A9FE3',
+  selectedDayTextColor: '#FFFFFF',
+  todayTextColor: '#1A9FE3',
+  dayTextColor: '#FFFFFF',
+  textDisabledColor: 'rgba(255,255,255,0.20)',
+  dotColor: '#1A9FE3',
+  arrowColor: '#1A9FE3',
+  monthTextColor: '#FFFFFF',
+  textDayFontWeight: '500' as const,
+  textMonthFontWeight: '700' as const,
+  textDayHeaderFontWeight: '600' as const,
+};
 
 const MONTHS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 const DAYS   = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
@@ -78,7 +96,7 @@ const DayCell = memo(function DayCell({ date, isCurrentMonth, isToday, events, o
         { width: CELL, height: CELL + 8, alignItems: 'center', paddingTop: 6, borderRadius: 10 },
         isToday && { backgroundColor: BLUE },
         !isCurrentMonth && { opacity: 0.3 },
-        hasEvents && !isToday && { backgroundColor: 'rgba(26,159,227,0.12)', borderWidth: StyleSheet.hairlineWidth, borderColor: T.border },
+        hasEvents && !isToday && { backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: StyleSheet.hairlineWidth, borderColor: T.border },
       ]}
       onPress={onPress}
       activeOpacity={hasEvents ? 0.7 : 1}
@@ -158,7 +176,7 @@ const DayModal = memo(function DayModal({ visible, date, events, onClose, onCrea
                         {!!ev.type && <Text style={[dm.evtType, { color: tc }]}>{ev.type}</Text>}
                       </View>
                       <View style={{ paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6,
-                        backgroundColor: ev.status === 'published' ? 'rgba(26,159,227,0.12)' : T.surf,
+                        backgroundColor: ev.status === 'published' ? 'rgba(255,255,255,0.05)' : T.surf,
                         borderWidth: StyleSheet.hairlineWidth,
                         borderColor: ev.status === 'published' ? T.borderHi : T.border }}>
                         <Text style={{ fontSize: 10, fontWeight: '700',
@@ -174,7 +192,7 @@ const DayModal = memo(function DayModal({ visible, date, events, onClose, onCrea
           ) : (
             <View style={{ alignItems: 'center', paddingVertical: 32, gap: 12 }}>
               <View style={{ width: 56, height: 56, borderRadius: 28,
-                backgroundColor: 'rgba(26,159,227,0.10)', alignItems: 'center', justifyContent: 'center',
+                backgroundColor: 'rgba(255,255,255,0.04)', alignItems: 'center', justifyContent: 'center',
                 borderWidth: 1, borderColor: T.borderHi }}>
                 <Ionicons name="calendar-outline" size={26} color={BLUE}/>
               </View>
@@ -184,7 +202,7 @@ const DayModal = memo(function DayModal({ visible, date, events, onClose, onCrea
           )}
 
           <TouchableOpacity style={dm.createBtn} onPress={onCreateEvent} activeOpacity={0.85}>
-            <LinearGradient colors={['rgba(26,159,227,0.30)','rgba(26,159,227,0.14)']} style={StyleSheet.absoluteFillObject}/>
+            <LinearGradient colors={['rgba(255,255,255,0.12)','rgba(26,159,227,0.14)']} style={StyleSheet.absoluteFillObject}/>
             <View pointerEvents="none" style={{position:'absolute',top:0,left:0,right:0,bottom:0,borderRadius:14,borderWidth:1,borderColor:T.borderHi}}/>
             <Ionicons name="add" size={18} color={BLUE}/>
             <Text style={dm.createTxt}>Créer un événement ce jour</Text>
@@ -236,7 +254,7 @@ const MonthLegend = memo(({ events }: { events: CalEvent[] }) => {
 const _NUM_P = 32;
 const _PCOLS = [
   '#1A9FE3','rgba(26,159,227,0.55)','#1A9FE3','rgba(26,159,227,0.40)',
-  'rgba(255,255,255,0.28)','rgba(255,255,255,0.16)','rgba(26,159,227,0.22)',
+  'rgba(255,255,255,0.28)','rgba(255,255,255,0.16)','rgba(255,255,255,0.07)',
 ];
 const _PARTS = Array.from({ length: _NUM_P }, (_, i) => ({
   x:   (Math.sin(i * 2.39996) * 0.5 + 0.5) * 100,
@@ -263,7 +281,7 @@ function ParticleBg() {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <LinearGradient colors={['#050E1B','#091628','#05112A','#050E1B']} locations={[0,0.3,0.7,1]} style={StyleSheet.absoluteFill}/>
-      <View style={{position:'absolute',top:'6%',left:'-25%',right:'-25%',height:'50%',backgroundColor:'rgba(26,159,227,0.035)',borderRadius:999}}/>
+      <View style={{position:'absolute',top:'6%',left:'-25%',right:'-25%',height:'50%',backgroundColor:'rgba(255,255,255,0.02)',borderRadius:999}}/>
       {_PARTS.map((p, i) => {
         const opacity = anims[i].interpolate({ inputRange:[0,1], outputRange:[0.10, p.glow ? 0.80 : 0.52] });
         const scale   = anims[i].interpolate({ inputRange:[0,1], outputRange:[0.6, 1.4] });
@@ -288,6 +306,7 @@ export default function CalendarScreen() {
   const [month,        setMonth]        = useState(new Date().getMonth());
   const [selectedDay,  setSelectedDay]  = useState<Date | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>('');
 
   const load = useCallback(async () => {
     try {
@@ -332,6 +351,24 @@ export default function CalendarScreen() {
     events.filter(ev => { const d = new Date(ev.date_start); return d.getFullYear() === year && d.getMonth() === month; }),
     [events, year, month]);
 
+  const markedDates = useMemo(() => {
+    const marks: Record<string, any> = {};
+    events.forEach(ev => {
+      const dateKey = ev.date_start?.split('T')[0] || ev.date_start?.split(' ')[0];
+      if (dateKey) marks[dateKey] = { marked: true, dotColor: '#1A9FE3', selectedColor: '#1A9FE3' };
+    });
+    if (selectedDate) {
+      marks[selectedDate] = { ...(marks[selectedDate] ?? {}), selected: true, selectedColor: '#1A9FE3' };
+    }
+    return marks;
+  }, [events, selectedDate]);
+
+  const selectedDateEvents = useMemo(() =>
+    selectedDate
+      ? events.filter(ev => (ev.date_start?.split('T')[0] || ev.date_start?.split(' ')[0]) === selectedDate)
+      : [],
+    [events, selectedDate]);
+
   const openDay = (date: Date) => { setSelectedDay(date); setModalVisible(true); };
 
   const headerAnim = useRef(new Animated.Value(0)).current;
@@ -356,7 +393,7 @@ export default function CalendarScreen() {
               onPress={() => router.push('/(organizer)/create-event' as any)}
               activeOpacity={0.82}
             >
-              <LinearGradient colors={['rgba(26,159,227,0.25)','rgba(26,159,227,0.10)']} style={StyleSheet.absoluteFillObject}/>
+              <LinearGradient colors={['rgba(255,255,255,0.10)','rgba(255,255,255,0.04)']} style={StyleSheet.absoluteFillObject}/>
               <Ionicons name="add" size={16} color={BLUE}/>
               <Text style={{ color: BLUE, fontWeight: '700', fontSize: 13 }}>Créer</Text>
             </TouchableOpacity>
@@ -397,33 +434,45 @@ export default function CalendarScreen() {
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{backgroundColor:'#050E1B',flexGrow:1, paddingHorizontal: EDGE, paddingBottom: 120, gap: 16 }} style={{backgroundColor:'#050E1B'}}>
 
-          {/* ── CALENDAR GRID ── */}
-          <View style={[cal.grid, { backgroundColor: '#0C1A30', borderColor: T.border }]}>
-            <LinearGradient colors={[`${BLUE}08`,`${BLUE}02`]} style={StyleSheet.absoluteFillObject}/>
-            <View style={{ flexDirection: 'row', marginBottom: 4 }}>
-              {DAYS.map((d, i) => (
-                <View key={i} style={{ flex: 1, alignItems: 'center', paddingVertical: 8 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: i >= 5 ? BLUE : T.muted }}>{d}</Text>
-                </View>
-              ))}
-            </View>
-            {Array.from({ length: calendarDays.length / 7 }, (_, weekIdx) => (
-              <View key={weekIdx} style={{ flexDirection: 'row', gap: 2, marginBottom: 2 }}>
-                {calendarDays.slice(weekIdx * 7, weekIdx * 7 + 7).map((date, dayIdx) => (
-                  <DayCell
-                    key={dayIdx}
-                    date={date}
-                    isCurrentMonth={date.getMonth() === month}
-                    isToday={isSameDay(date, today)}
-                    events={eventsOnDay(date)}
-                    onPress={() => openDay(date)}
-                  />
-                ))}
-              </View>
-            ))}
-            <View pointerEvents="none" style={{position:'absolute',top:0,left:0,right:0,bottom:0,
-              borderRadius:16,borderWidth:StyleSheet.hairlineWidth,borderColor:T.border}}/>
+          {/* ── REACT-NATIVE-CALENDARS ── */}
+          <View style={{ borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', backgroundColor: 'rgba(255,255,255,0.03)' }}>
+            <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+            <Calendar
+              theme={CAL_THEME}
+              markedDates={markedDates}
+              onDayPress={day => setSelectedDate(day.dateString)}
+              style={{ backgroundColor: 'transparent' }}
+            />
           </View>
+
+          {/* ── EVENTS FOR SELECTED DATE ── */}
+          {selectedDate.length > 0 && (
+            <View style={{ gap: 8 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: T.muted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                {selectedDate} · <Text style={{ color: BLUE }}>{selectedDateEvents.length}</Text> événement{selectedDateEvents.length !== 1 ? 's' : ''}
+              </Text>
+              {selectedDateEvents.length === 0 ? (
+                <Text style={{ color: T.muted, fontSize: 13 }}>Aucun événement ce jour.</Text>
+              ) : selectedDateEvents.map(ev => {
+                const tc = typeColor(ev.type);
+                return (
+                  <TouchableOpacity
+                    key={ev.id}
+                    style={[cal.evtCard, { backgroundColor: '#0C1A30', borderColor: T.border, borderLeftColor: tc }]}
+                    onPress={() => router.push({ pathname: '/(organizer)/event/[id]', params: { id: ev.id } } as any)}
+                    activeOpacity={0.82}
+                  >
+                    <LinearGradient colors={[`${tc}0A`, `${tc}03`]} style={StyleSheet.absoluteFillObject}/>
+                    <View style={{ flex: 1, gap: 3 }}>
+                      <Text style={[cal.evtTitle, { color: T.white }]} numberOfLines={1}>{ev.title}</Text>
+                      <Text style={[cal.evtLoc, { color: T.muted }]} numberOfLines={1}>{ev.location}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={14} color={T.muted}/>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
 
           {/* ── LEGEND ── */}
           {monthEvents.length > 0 && <MonthLegend events={monthEvents}/>}
@@ -457,7 +506,7 @@ export default function CalendarScreen() {
                     <View style={{ alignItems: 'flex-end', gap: 6 }}>
                       {!isPast && (
                         <View style={{ paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6,
-                          backgroundColor: days <= 3 ? 'rgba(255,255,255,0.05)' : days <= 7 ? 'rgba(255,255,255,0.07)' : 'rgba(26,159,227,0.10)',
+                          backgroundColor: days <= 3 ? 'rgba(255,255,255,0.05)' : days <= 7 ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.04)',
                           borderWidth: StyleSheet.hairlineWidth,
                           borderColor: days <= 3 ? 'rgba(239,68,68,0.25)' : days <= 7 ? 'rgba(245,158,11,0.25)' : T.border }}>
                           <Text style={{ fontSize: 10, fontWeight: '700',
@@ -479,7 +528,7 @@ export default function CalendarScreen() {
           {monthEvents.length === 0 && !loading && (
             <View style={{ alignItems: 'center', paddingVertical: 40, gap: 12 }}>
               <View style={{ width: 64, height: 64, borderRadius: 32,
-                backgroundColor: 'rgba(26,159,227,0.10)', alignItems: 'center', justifyContent: 'center',
+                backgroundColor: 'rgba(255,255,255,0.04)', alignItems: 'center', justifyContent: 'center',
                 borderWidth: 1, borderColor: T.borderHi }}>
                 <Ionicons name="calendar-outline" size={28} color={BLUE}/>
               </View>

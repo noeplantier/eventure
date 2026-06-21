@@ -73,9 +73,9 @@ interface Section {
 /* ─── Status config ──────────────────────────────────────────────────────── */
 const STATUS_CONFIG: Record<MissionStatus, { label: string; color: string; bg: string; icon: string }> = {
   pending    : { label: 'En attente',  color: 'rgba(255,255,255,0.55)', bg: 'rgba(255,255,255,0.07)', icon: 'time-outline' },
-  confirmed  : { label: 'Confirmée',   color: '#1A9FE3',                bg: 'rgba(26,159,227,0.15)',  icon: 'checkmark-circle-outline' },
-  in_progress: { label: 'En cours',    color: '#FFFFFF',                bg: 'rgba(26,159,227,0.20)',  icon: 'flash-outline' },
-  completed  : { label: 'Terminée',    color: 'rgba(255,255,255,0.70)', bg: 'rgba(26,159,227,0.10)',  icon: 'checkmark-done-outline' },
+  confirmed  : { label: 'Confirmée',   color: '#1A9FE3',                bg: 'rgba(255,255,255,0.05)',  icon: 'checkmark-circle-outline' },
+  in_progress: { label: 'En cours',    color: '#FFFFFF',                bg: 'rgba(255,255,255,0.09)',  icon: 'flash-outline' },
+  completed  : { label: 'Terminée',    color: 'rgba(255,255,255,0.70)', bg: 'rgba(255,255,255,0.04)',  icon: 'checkmark-done-outline' },
   cancelled  : { label: 'Annulée',     color: 'rgba(255,255,255,0.35)', bg: 'rgba(255,255,255,0.05)', icon: 'close-circle-outline' },
 };
 
@@ -106,7 +106,7 @@ const fmtMoney = (n: number | null | undefined) =>
 const _NUM_P = 32;
 const _PCOLS = [
   '#1A9FE3','rgba(26,159,227,0.55)','#1A9FE3','rgba(26,159,227,0.40)',
-  'rgba(255,255,255,0.28)','rgba(255,255,255,0.16)','rgba(26,159,227,0.22)',
+  'rgba(255,255,255,0.28)','rgba(255,255,255,0.16)','rgba(255,255,255,0.07)',
 ];
 const _PARTS = Array.from({ length: _NUM_P }, (_, i) => ({
   x:   (Math.sin(i * 2.39996) * 0.5 + 0.5) * 100,
@@ -133,7 +133,7 @@ function ParticleBg() {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <LinearGradient colors={['#050E1B','#091628','#05112A','#050E1B']} locations={[0,0.3,0.7,1]} style={StyleSheet.absoluteFill}/>
-      <View style={{position:'absolute',top:'6%',left:'-25%',right:'-25%',height:'50%',backgroundColor:'rgba(26,159,227,0.035)',borderRadius:999}}/>
+      <View style={{position:'absolute',top:'6%',left:'-25%',right:'-25%',height:'50%',backgroundColor:'rgba(255,255,255,0.02)',borderRadius:999}}/>
       {_PARTS.map((p, i) => {
         const opacity = anims[i].interpolate({ inputRange:[0,1], outputRange:[0.10, p.glow ? 0.80 : 0.52] });
         const scale   = anims[i].interpolate({ inputRange:[0,1], outputRange:[0.6, 1.4] });
@@ -347,7 +347,7 @@ function MissionCard({ mission: m, onCheckIn, onCheckOut, onPay }: MissionCardPr
         <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
           {m.status === 'confirmed' && (
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: 'rgba(26,159,227,0.15)', borderColor: `${BLUE}40`, flexDirection: 'row', alignItems: 'center', gap: 5 }]}
+              style={[styles.actionBtn, { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: `${BLUE}40`, flexDirection: 'row', alignItems: 'center', gap: 5 }]}
               onPress={() => onCheckIn(m.id)}
               activeOpacity={0.78}
             >
@@ -357,7 +357,7 @@ function MissionCard({ mission: m, onCheckIn, onCheckOut, onPay }: MissionCardPr
           )}
           {m.status === 'in_progress' && (
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: 'rgba(26,159,227,0.12)', borderColor: `${GOLD}40`, flexDirection: 'row', alignItems: 'center', gap: 5 }]}
+              style={[styles.actionBtn, { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: `${GOLD}40`, flexDirection: 'row', alignItems: 'center', gap: 5 }]}
               onPress={() => onCheckOut(m.id, m.check_in_time ?? new Date().toISOString(), m.hourly_rate)}
               activeOpacity={0.78}
             >
@@ -367,7 +367,7 @@ function MissionCard({ mission: m, onCheckIn, onCheckOut, onPay }: MissionCardPr
           )}
           {m.status === 'completed' && paid < due && (
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: 'rgba(26,159,227,0.15)', borderColor: `${BLUE}40`, flexDirection: 'row', alignItems: 'center', gap: 5 }]}
+              style={[styles.actionBtn, { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: `${BLUE}40`, flexDirection: 'row', alignItems: 'center', gap: 5 }]}
               onPress={() => onPay(m.id, due)}
               activeOpacity={0.78}
             >
@@ -718,7 +718,7 @@ export default function MissionsScreen() {
     return (
       <View style={{ alignItems: 'center', paddingTop: 60, gap: 14 }}>
         <View style={{
-          width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(26,159,227,0.12)',
+          width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.05)',
           alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: `${BLUE}30`,
         }}>
           <Ionicons name="flash-outline" size={36} color={BLUE}/>

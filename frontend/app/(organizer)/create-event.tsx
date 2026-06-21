@@ -11,6 +11,7 @@ import React, { useState, useCallback } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -25,6 +26,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
+import { Calendar } from 'react-native-calendars';
+import * as Location from 'expo-location';
 import { supabase } from '@/lib/supabase';
 import { getWorkingOrganizerId } from '@/lib/mockUser';
 import { useInteractiveBg } from '@/components/InteractiveBg';
@@ -32,7 +35,7 @@ import { useInteractiveBg } from '@/components/InteractiveBg';
 /* ─── Palette ────────────────────────────────────────────────────────────── */
 const BG   = '#050E1B';
 const BLUE = '#1A9FE3';
-const DIM  = 'rgba(26,159,227,0.18)';
+const DIM  = 'rgba(255,255,255,0.06)';
 const EDGE = 20;
 
 const T = {
@@ -41,13 +44,31 @@ const T = {
   muted   : 'rgba(255,255,255,0.55)',
   faint   : 'rgba(255,255,255,0.22)',
   surf    : 'rgba(255,255,255,0.05)',
-  border  : 'rgba(26,159,227,0.18)',
+  border  : 'rgba(255,255,255,0.06)',
   borderHi: 'rgba(26,159,227,0.45)',
   navy    : '#0B1829',
   red     : '#F87171',
   redDim  : 'rgba(248,113,113,0.12)',
   redBdr  : 'rgba(248,113,113,0.30)',
 } as const;
+
+/* ─── Calendar theme ─────────────────────────────────────────────────────── */
+const CAL_THEME = {
+  backgroundColor: 'transparent',
+  calendarBackground: 'transparent',
+  textSectionTitleColor: 'rgba(255,255,255,0.45)',
+  selectedDayBackgroundColor: '#1A9FE3',
+  selectedDayTextColor: '#FFFFFF',
+  todayTextColor: '#1A9FE3',
+  dayTextColor: '#FFFFFF',
+  textDisabledColor: 'rgba(255,255,255,0.20)',
+  dotColor: '#1A9FE3',
+  arrowColor: '#1A9FE3',
+  monthTextColor: '#FFFFFF',
+  textDayFontWeight: '500' as const,
+  textMonthFontWeight: '700' as const,
+  textDayHeaderFontWeight: '600' as const,
+};
 
 /* ─── Event types ────────────────────────────────────────────────────────── */
 const EVENT_TYPES = [
@@ -316,11 +337,29 @@ export default function CreateEventScreen() {
   const [errors, setErrors] = useState<Partial<Record<keyof EventForm | 'submit', string>>>({});
   const [saving, setSaving] = useState(false);
 
+  const [showCalStart, setShowCalStart] = useState(false);
+  const [showCalEnd,   setShowCalEnd]   = useState(false);
+  const [geoLoading,   setGeoLoading]   = useState(false);
+
   /* helpers */
   const upd = useCallback(<K extends keyof EventForm>(key: K, val: EventForm[K]) => {
     setForm(f => ({ ...f, [key]: val }));
     setErrors(e => { const n = { ...e }; delete n[key]; return n; });
   }, []);
+
+  /* ── Geolocation ── */
+  const fillCurrentLocation = async () => {
+    try {
+      setGeoLoading(true);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') { setGeoLoading(false); return; }
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const [addr] = await Location.reverseGeocodeAsync(loc.coords);
+      const label = [addr.street, addr.streetNumber, addr.city, addr.country].filter(Boolean).join(', ');
+      upd('location', label || `${loc.coords.latitude.toFixed(4)}, ${loc.coords.longitude.toFixed(4)}`);
+    } catch { /* silent */ }
+    finally { setGeoLoading(false); }
+  };
 
   /* ── Validation per step ── */
   const validate = useCallback((s: number): boolean => {
@@ -422,23 +461,49 @@ export default function CreateEventScreen() {
         <Text style={ss.cardTitle}>Date et lieu</Text>
 
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          <View style={{ flex: 1 }}>
-            <Field
-              label="DEBUT *"
-              value={form.date_start}
-              onChangeText={v => upd('date_start', v)}
-              placeholder="YYYY-MM-DD HH:MM"
-              hasError={!!errors.date_start}
-              errorMsg={errors.date_start}
-            />
+          {/* Date de début */}
+          <View style={{ flex: 1, marginBottom: 16 }}>
+            <Text style={{ color: 'rgba(255,255,255,0.50)', fontSize: 10.5, fontWeight: '700', letterSpacing: 1.2, marginBottom: 8 }}>
+              DATE DE DÉBUT *
+            </Text>
+            <TouchableOpacity
+              onPress={() => setShowCalStart(true)}
+              style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 14,
+                borderWidth: 1, borderColor: errors.date_start ? 'rgba(255,80,80,0.5)' : 'rgba(255,255,255,0.06)',
+                paddingHorizontal: 14, paddingVertical: 14,
+              }}
+            >
+              <Text style={{ color: form.date_start ? '#FFFFFF' : 'rgba(255,255,255,0.30)', fontSize: 15 }}>
+                {form.date_start || 'Sélectionner'}
+              </Text>
+              <Ionicons name="calendar-outline" size={18} color="#1A9FE3" />
+            </TouchableOpacity>
+            {errors.date_start && (
+              <Text style={{ color: 'rgba(255,80,80,0.8)', fontSize: 11, marginTop: 4 }}>{errors.date_start}</Text>
+            )}
           </View>
-          <View style={{ flex: 1 }}>
-            <Field
-              label="FIN"
-              value={form.date_end}
-              onChangeText={v => upd('date_end', v)}
-              placeholder="YYYY-MM-DD HH:MM"
-            />
+
+          {/* Date de fin */}
+          <View style={{ flex: 1, marginBottom: 16 }}>
+            <Text style={{ color: 'rgba(255,255,255,0.50)', fontSize: 10.5, fontWeight: '700', letterSpacing: 1.2, marginBottom: 8 }}>
+              DATE DE FIN
+            </Text>
+            <TouchableOpacity
+              onPress={() => setShowCalEnd(true)}
+              style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 14,
+                borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+                paddingHorizontal: 14, paddingVertical: 14,
+              }}
+            >
+              <Text style={{ color: form.date_end ? '#FFFFFF' : 'rgba(255,255,255,0.30)', fontSize: 15 }}>
+                {form.date_end || 'Sélectionner'}
+              </Text>
+              <Ionicons name="calendar-outline" size={18} color="#1A9FE3" />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -451,6 +516,23 @@ export default function CreateEventScreen() {
           errorMsg={errors.location}
           hint="Adresse complete ou nom de la salle"
         />
+        <TouchableOpacity
+          onPress={fillCurrentLocation}
+          disabled={geoLoading}
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8,
+            alignSelf: 'flex-start',
+            backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 20,
+            paddingHorizontal: 14, paddingVertical: 7,
+            borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+          }}
+        >
+          {geoLoading
+            ? <ActivityIndicator size="small" color="#1A9FE3" />
+            : <Ionicons name="navigate-outline" size={14} color="#1A9FE3" />
+          }
+          <Text style={{ color: '#1A9FE3', fontSize: 12, fontWeight: '600' }}>Ma position actuelle</Text>
+        </TouchableOpacity>
       </GlassCard>
     </View>
   );
@@ -715,7 +797,7 @@ export default function CreateEventScreen() {
             style={{ flex: 2, borderRadius: 14, overflow: 'hidden' }}
           >
             <LinearGradient
-              colors={['rgba(26,159,227,0.30)', 'rgba(26,159,227,0.14)']}
+              colors={['rgba(255,255,255,0.12)', 'rgba(26,159,227,0.14)']}
               style={ss.nextGrad}
             >
               <Text style={{ color: BLUE, fontSize: 15, fontWeight: '900' }}>
@@ -726,6 +808,64 @@ export default function CreateEventScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Calendar Modal — start date */}
+      <Modal visible={showCalStart} transparent animationType="slide" onRequestClose={() => setShowCalStart(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(5,14,27,0.85)' }}>
+          <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+          <View style={{
+            backgroundColor: '#0A1628', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+            paddingTop: 20, paddingHorizontal: 16, paddingBottom: 40,
+            borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+          }}>
+            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center', marginBottom: 16 }} />
+            <Text style={{ color: '#FFFFFF', fontSize: 17, fontWeight: '700', textAlign: 'center', marginBottom: 16 }}>
+              Date de début
+            </Text>
+            <Calendar
+              theme={CAL_THEME}
+              onDayPress={day => { upd('date_start', day.dateString + ' 20:00'); setShowCalStart(false); }}
+              markedDates={form.date_start ? { [form.date_start.split(' ')[0]]: { selected: true, selectedColor: '#1A9FE3' } } : {}}
+              minDate={new Date().toISOString().split('T')[0]}
+            />
+            <TouchableOpacity
+              onPress={() => setShowCalStart(false)}
+              style={{ marginTop: 12, alignItems: 'center', padding: 14, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 14 }}
+            >
+              <Text style={{ color: 'rgba(255,255,255,0.55)', fontWeight: '600' }}>Annuler</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Calendar Modal — end date */}
+      <Modal visible={showCalEnd} transparent animationType="slide" onRequestClose={() => setShowCalEnd(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(5,14,27,0.85)' }}>
+          <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+          <View style={{
+            backgroundColor: '#0A1628', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+            paddingTop: 20, paddingHorizontal: 16, paddingBottom: 40,
+            borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+          }}>
+            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center', marginBottom: 16 }} />
+            <Text style={{ color: '#FFFFFF', fontSize: 17, fontWeight: '700', textAlign: 'center', marginBottom: 16 }}>
+              Date de fin
+            </Text>
+            <Calendar
+              theme={CAL_THEME}
+              onDayPress={day => { upd('date_end', day.dateString + ' 23:59'); setShowCalEnd(false); }}
+              markedDates={form.date_end ? { [form.date_end.split(' ')[0]]: { selected: true, selectedColor: '#1A9FE3' } } : {}}
+              minDate={form.date_start?.split(' ')[0] || new Date().toISOString().split('T')[0]}
+            />
+            <TouchableOpacity
+              onPress={() => setShowCalEnd(false)}
+              style={{ marginTop: 12, alignItems: 'center', padding: 14, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 14 }}
+            >
+              <Text style={{ color: 'rgba(255,255,255,0.55)', fontWeight: '600' }}>Annuler</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
