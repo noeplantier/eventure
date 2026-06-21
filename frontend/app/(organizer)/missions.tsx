@@ -1,648 +1,893 @@
 /**
  * app/(organizer)/missions.tsx — EVENTURE v3
- * Dark green theme — hardcoded design tokens.
+ * Ultra-sophisticated mission management with real-time status,
+ * payment tracking, timeline view, check-in/out actions, financial summary.
  */
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback, useEffect, useMemo, useRef, useState,
+} from 'react';
 import {
-  Animated, Dimensions, Easing, FlatList, Image, RefreshControl, ScrollView,
+  Animated, RefreshControl, SectionList, StatusBar,
   StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
-import { LinearGradient }  from 'expo-linear-gradient';
-import { Ionicons }        from '@expo/vector-icons';
-import { SafeAreaView }    from 'react-native-safe-area-context';
-import { useRouter }       from 'expo-router';
-import { supabase }        from '@/lib/supabase';
-import { getWorkingUid }   from '@/lib/mockUser';
+import { LinearGradient }          from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+import { Ionicons }                from '@expo/vector-icons';
+import { useRouter }               from 'expo-router';
+import { useSafeAreaInsets }       from 'react-native-safe-area-context';
+import { supabase }                from '../../lib/supabase';
+import { getWorkingOrganizerId }   from '../../lib/mockUser';
+import { useInteractiveBg } from '../../components/InteractiveBg';
 
 /* ─── Design tokens ──────────────────────────────────────────────────────── */
-const { width: SW } = Dimensions.get('window');
-const BG    = '#050E1B';
-const GOLD  = '#F5C842';
+const BG       = '#050E1B';
+const BLUE     = '#1A9FE3';
+const CYAN     = '#1A9FE3';
+const GOLD     = '#FFFFFF';
+const NAVY     = '#0C1A30';
+const WHITE    = '#FFFFFF';
+const MUTED    = 'rgba(255,255,255,0.55)';
+const FAINT    = 'rgba(255,255,255,0.08)';
+const RED      = 'rgba(255,255,255,0.45)';
+const GREEN_OK = '#1A9FE3';
 
-const T = {
-  white   : '#FFFFFF',
-  offWhite: 'rgba(255,255,255,0.88)',
-  muted   : 'rgba(255,255,255,0.50)',
-  faint   : 'rgba(255,255,255,0.18)',
-  surf    : 'rgba(255,255,255,0.045)',
-  surfHi  : 'rgba(255,255,255,0.09)',
-  border  : 'rgba(26,159,227,0.12)',
-  borderHi: 'rgba(26,159,227,0.30)',
-  navy    : '#0C1A30',
-  amber   : '#F59E0B',
-  red     : '#EF4444',
-  blue    : '#60A5FA',
-  purple  : '#A78BFA',
-} as const;
+/* ─── Types ──────────────────────────────────────────────────────────────── */
+type MissionStatus = 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
 
-const SUCCESS = '#10B981';
-const WARNING = '#F59E0B';
-const DANGER  = '#EF4444';
-const BLUE    = '#1A9FE3';
-const EDGE    = 16;
-/* ─── Payment status config ──────────────────────────────────────────────── */
-type PayStatus = 'pending' | 'paid' | 'partial' | 'cancelled';
+type FilterTab = MissionStatus | 'all';
 
-const PAY: Record<PayStatus, { l: string; c: string; icon: React.ComponentProps<typeof Ionicons>['name'] }> = {
-  pending  : { l: 'En attente', c: WARNING, icon: 'time-outline' },
-  paid     : { l: 'Payé',       c: SUCCESS, icon: 'checkmark-circle-outline' },
-  partial  : { l: 'Partiel',    c: BLUE,    icon: 'ellipsis-horizontal-circle-outline' },
-  cancelled: { l: 'Annulé',     c: DANGER,  icon: 'close-circle-outline' },
+interface EventRow {
+  id: string;
+  title: string;
+  type: string | null;
+  date_start: string;
+}
+
+interface Mission {
+  id: string;
+  application_id: string | null;
+  event_id: string;
+  staff_id: string;
+  role: string;
+  date_start: string;
+  date_end: string;
+  status: MissionStatus;
+  hourly_rate: number;
+  hours_worked: number | null;
+  amount_due: number | null;
+  amount_paid: number | null;
+  check_in_time: string | null;
+  check_out_time: string | null;
+  notes: string | null;
+  // merged
+  event?: EventRow;
+  staff_name?: string;
+}
+
+interface Section {
+  eventId: string;
+  event: EventRow | undefined;
+  data: Mission[];
+}
+
+/* ─── Status config ──────────────────────────────────────────────────────── */
+const STATUS_CONFIG: Record<MissionStatus, { label: string; color: string; bg: string; icon: string }> = {
+  pending    : { label: 'En attente',  color: 'rgba(255,255,255,0.55)', bg: 'rgba(255,255,255,0.07)', icon: 'time-outline' },
+  confirmed  : { label: 'Confirmée',   color: '#1A9FE3',                bg: 'rgba(26,159,227,0.15)',  icon: 'checkmark-circle-outline' },
+  in_progress: { label: 'En cours',    color: '#FFFFFF',                bg: 'rgba(26,159,227,0.20)',  icon: 'flash-outline' },
+  completed  : { label: 'Terminée',    color: 'rgba(255,255,255,0.70)', bg: 'rgba(26,159,227,0.10)',  icon: 'checkmark-done-outline' },
+  cancelled  : { label: 'Annulée',     color: 'rgba(255,255,255,0.35)', bg: 'rgba(255,255,255,0.05)', icon: 'close-circle-outline' },
 };
 
 /* ─── Event type colors ──────────────────────────────────────────────────── */
 const TYPE_COLOR: Record<string, string> = {
-  'Gala': GOLD, 'Festival': SUCCESS, 'Conférence': T.blue,
-  'Mariage': '#F472B6', 'Séminaire': T.purple, 'Soirée': T.amber,
-  'Concert': T.red, 'Sport': '#34D399',
+  Gala: GOLD, Festival: BLUE, 'Conférence': CYAN,
+  Mariage: BLUE, 'Séminaire': '#1A9FE3', 'Soirée': GOLD,
+  Concert: RED, Sport: BLUE,
 };
-const typeColor = (t: string | null) => TYPE_COLOR[t ?? ''] ?? T.muted;
-
-/* ─── Types ──────────────────────────────────────────────────────────────── */
-interface Mission {
-  id: string; application_id: string | null; staff_id: string | null; event_id: string | null;
-  check_in: string | null; check_out: string | null; hours_worked: number | null;
-  amount_due: number | null; amount_paid: number | null; payment_status: PayStatus;
-  stripe_transfer: string | null; created_at: string;
-  staff_name: string; staff_avatar: string | null; staff_role: string[];
-  event_title: string; event_date: string; event_location: string; event_type: string | null;
-  event_status: string;
-}
+const typeColor = (t: string | null | undefined) => TYPE_COLOR[t ?? ''] ?? BLUE;
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
-const fmt = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
-const fmtTime  = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—';
-const fmtMoney = (n: number | null) =>
-  n != null ? `${Number(n).toLocaleString('fr-FR')}€` : '—';
+const fmtDate = (iso: string | null | undefined) =>
+  iso
+    ? new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso))
+    : '—';
+
+const fmtTime = (iso: string | null | undefined) =>
+  iso
+    ? new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(new Date(iso))
+    : '—';
+
+const fmtMoney = (n: number | null | undefined) =>
+  n != null ? `${Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €` : '—';
 
 /* ─── Particle background ────────────────────────────────────────────────── */
-const PCOLS = ['#1A9FE3','rgba(26,159,227,0.4)','#F5C842','rgba(245,200,66,0.32)','rgba(255,255,255,0.16)'];
-const PTS   = Array.from({length:18},(_,i)=>({
-  id:i, x:((Math.sin(i*2.399)+1)/2)*SW, y:((Math.cos(i*1.618)+1)/2)*900,
-  sz:0.8+(i%8)*0.2, col:PCOLS[i%PCOLS.length], op:0.04+(i%6)*0.03,
+/* ─── Enhanced particles ─── */
+const _NUM_P = 32;
+const _PCOLS = [
+  '#1A9FE3','rgba(26,159,227,0.55)','#1A9FE3','rgba(26,159,227,0.40)',
+  'rgba(255,255,255,0.28)','rgba(255,255,255,0.16)','rgba(26,159,227,0.22)',
+];
+const _PARTS = Array.from({ length: _NUM_P }, (_, i) => ({
+  x:   (Math.sin(i * 2.39996) * 0.5 + 0.5) * 100,
+  y:   (Math.cos(i * 1.61803) * 0.5 + 0.5) * 100,
+  sz:  i % 9 === 0 ? 4.5 : i % 5 === 0 ? 3 : i % 3 === 0 ? 2.2 : 1.6,
+  col: _PCOLS[i % _PCOLS.length],
+  dur: 2400 + (i % 7) * 600,
+  del: (i % 9) * 220,
+  glow: i % 7 === 0,
 }));
-const ParticleBg = memo(() => (
-  <View style={StyleSheet.absoluteFill} pointerEvents="none">
-    <LinearGradient colors={[BG,'#091628',BG]} style={StyleSheet.absoluteFill}/>
-    <View style={{position:'absolute',top:'6%',left:'12%',width:SW*.7,height:SW*.7,borderRadius:SW*.35,backgroundColor:'rgba(26,159,227,0.025)'}}/>
-    <View style={{position:'absolute',bottom:'8%',right:'-18%',width:SW*.6,height:SW*.6,borderRadius:SW*.3,backgroundColor:'rgba(56,189,248,0.02)'}}/>
-    {PTS.map(p=><View key={p.id} style={{position:'absolute',left:p.x,top:p.y,width:p.sz,height:p.sz,borderRadius:p.sz/2,backgroundColor:p.col,opacity:p.op}}/>)}
-  </View>
-));
-
-/* ─── Card component ─────────────────────────────────────────────────────── */
-const Card = memo(({children,style,glow=BLUE}:{children:React.ReactNode;style?:any;glow?:string}) => (
-  <View style={[{borderRadius:20,overflow:'hidden',padding:18,gap:14,backgroundColor:T.navy},style]}>
-    <LinearGradient colors={[`${glow}0B`,`${glow}03`]} style={StyleSheet.absoluteFillObject}/>
-    {children}
-    <View pointerEvents="none" style={{position:'absolute',top:0,left:0,right:0,bottom:0,borderRadius:20,borderWidth:StyleSheet.hairlineWidth,borderColor:T.border}}/>
-  </View>
-));
-
-/* ─── Counter ────────────────────────────────────────────────────────────── */
-const Counter = memo(({ value, suffix = '', prefix = '', decimals = 0, color = T.white, size = 26 }: {
-  value: number; suffix?: string; prefix?: string; decimals?: number; color?: string; size?: number;
-}) => {
-  const anim = useRef(new Animated.Value(0)).current;
-  const [txt, setTxt] = useState(`${prefix}0${suffix}`);
-  useEffect(() => {
-    anim.setValue(0);
-    const l = anim.addListener(({ value: v }) => setTxt(`${prefix}${v.toFixed(decimals)}${suffix}`));
-    Animated.timing(anim, { toValue: value, duration: 850, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
-    return () => anim.removeListener(l);
-  }, [value]);
-  return <Text style={{ color, fontSize: size, fontWeight: '900', letterSpacing: -0.5 }}>{txt}</Text>;
-});
-
-/* ─── LiveDot ────────────────────────────────────────────────────────────── */
-const LiveDot = memo(() => {
-  const p = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    const loop = Animated.loop(Animated.sequence([
-      Animated.timing(p, { toValue: 1.85, duration: 900, useNativeDriver: true }),
-      Animated.timing(p, { toValue: 1,    duration: 900, useNativeDriver: true }),
-    ]));
-    loop.start(); return () => loop.stop();
+function ParticleBg() {
+  const anims = React.useRef(_PARTS.map(() => new Animated.Value(0))).current;
+  React.useEffect(() => {
+    const loops = anims.map((anim, i) =>
+      Animated.loop(Animated.sequence([
+        Animated.delay(_PARTS[i].del),
+        Animated.timing(anim, { toValue: 1, duration: _PARTS[i].dur / 2, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0, duration: _PARTS[i].dur / 2, useNativeDriver: true }),
+      ]))
+    );
+    loops.forEach(l => l.start());
+    return () => loops.forEach(l => l.stop());
   }, []);
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-      <View style={{ position: 'relative', width: 10, height: 10, alignItems: 'center', justifyContent: 'center' }}>
-        <Animated.View style={{ position: 'absolute', width: 10, height: 10, borderRadius: 5, backgroundColor: `${BLUE}28`, transform: [{ scale: p }] }}/>
-        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: BLUE }}/>
-      </View>
-      <Text style={{ color: BLUE, fontSize: 9, fontWeight: '700', letterSpacing: 0.4 }}>LIVE</Text>
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <LinearGradient colors={['#050E1B','#091628','#05112A','#050E1B']} locations={[0,0.3,0.7,1]} style={StyleSheet.absoluteFill}/>
+      <View style={{position:'absolute',top:'6%',left:'-25%',right:'-25%',height:'50%',backgroundColor:'rgba(26,159,227,0.035)',borderRadius:999}}/>
+      {_PARTS.map((p, i) => {
+        const opacity = anims[i].interpolate({ inputRange:[0,1], outputRange:[0.10, p.glow ? 0.80 : 0.52] });
+        const scale   = anims[i].interpolate({ inputRange:[0,1], outputRange:[0.6, 1.4] });
+        return (
+          <Animated.View key={i} style={{
+            position:'absolute', left:`${p.x}%` as any, top:`${p.y}%` as any,
+            width:p.sz, height:p.sz, borderRadius:p.sz/2, backgroundColor:p.col,
+            opacity, transform:[{scale}],
+          }}/>
+        );
+      })}
     </View>
   );
-});
+}
 
-/* ─── ProgBar ────────────────────────────────────────────────────────────── */
-const ProgBar = memo(({ value, max, color = BLUE, label, right }: {
-  value: number; max: number; color?: string; label: string; right: string;
-}) => {
-  const animV = useRef(new Animated.Value(0)).current;
-  const pct   = max > 0 ? Math.min(value / max, 1) : 0;
+/* ─── Avatar ─────────────────────────────────────────────────────────────── */
+function Avatar({ name, size = 36 }: { name: string; size?: number }) {
+  const initials = name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  return (
+    <View style={{
+      width: size, height: size, borderRadius: size / 2,
+      backgroundColor: BLUE, alignItems: 'center', justifyContent: 'center',
+    }}>
+      <Text style={{ color: WHITE, fontSize: size * 0.36, fontWeight: '700' }}>{initials}</Text>
+    </View>
+  );
+}
+
+/* ─── Payment progress bar ───────────────────────────────────────────────── */
+function PayBar({ paid, due }: { paid: number; due: number }) {
+  const pct = due > 0 ? Math.min(paid / due, 1) : 0;
+  return (
+    <View style={{ height: 4, backgroundColor: FAINT, borderRadius: 2, overflow: 'hidden' }}>
+      <View style={{
+        width: `${pct * 100}%` as any, height: '100%',
+        backgroundColor: pct >= 1 ? GREEN_OK : BLUE, borderRadius: 2,
+      }} />
+    </View>
+  );
+}
+
+/* ─── Pulsing active dot ─────────────────────────────────────────────────── */
+function PulseDot({ color = BLUE }: { color?: string }) {
+  const scale = useRef(new Animated.Value(1)).current;
   useEffect(() => {
-    animV.setValue(0);
-    Animated.timing(animV, { toValue: pct, duration: 880, delay: 120, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
-  }, [pct]);
+    Animated.loop(Animated.sequence([
+      Animated.timing(scale, { toValue: 1.6, duration: 700, useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 1,   duration: 700, useNativeDriver: true }),
+    ])).start();
+  }, []);
   return (
-    <View style={{ gap: 5 }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Text style={{ color: T.muted, fontSize: 12, fontWeight: '600' }}>{label}</Text>
-        <Text style={{ color, fontSize: 12, fontWeight: '800' }}>{right}</Text>
-      </View>
-      <View style={{ height: 5, borderRadius: 2.5, backgroundColor: T.faint, overflow: 'hidden' }}>
-        <Animated.View style={{
-          position: 'absolute', top: 0, left: 0, bottom: 0, borderRadius: 2.5,
-          backgroundColor: color,
-          width: animV.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
-        }}/>
-      </View>
+    <View style={{ width: 10, height: 10, alignItems: 'center', justifyContent: 'center' }}>
+      <Animated.View style={{
+        position: 'absolute', width: 10, height: 10,
+        borderRadius: 5, backgroundColor: `${color}40`, transform: [{ scale }],
+      }} />
+      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
     </View>
   );
-});
-
-/* ─── TrendBadge ─────────────────────────────────────────────────────────── */
-const TrendBadge = memo(({ curr, prev }: { curr: number; prev: number }) => {
-  if (prev === 0 || curr === prev) return null;
-  const pct = Math.round(((curr - prev) / prev) * 100);
-  const up  = pct > 0;
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8,
-      backgroundColor: up ? 'rgba(26,159,227,0.12)' : 'rgba(239,68,68,0.12)' }}>
-      <Ionicons name={up ? 'trending-up' : 'trending-down'} size={10} color={up ? BLUE : T.red}/>
-      <Text style={{ color: up ? BLUE : T.red, fontSize: 9, fontWeight: '800' }}>{up ? '+' : ''}{pct}%</Text>
-    </View>
-  );
-});
+}
 
 /* ─── Skeleton ───────────────────────────────────────────────────────────── */
-const Skeleton = memo(() => {
-  const a = useRef(new Animated.Value(0)).current;
+function Skeleton() {
+  const op = useRef(new Animated.Value(0.3)).current;
   useEffect(() => {
-    const loop = Animated.loop(Animated.sequence([
-      Animated.timing(a, { toValue: 1, duration: 860, useNativeDriver: true }),
-      Animated.timing(a, { toValue: 0, duration: 860, useNativeDriver: true }),
-    ]));
-    loop.start(); return () => loop.stop();
+    Animated.loop(Animated.sequence([
+      Animated.timing(op, { toValue: 0.7, duration: 800, useNativeDriver: true }),
+      Animated.timing(op, { toValue: 0.3, duration: 800, useNativeDriver: true }),
+    ])).start();
   }, []);
-  const op = a.interpolate({ inputRange: [0, 1], outputRange: [0.25, 0.6] });
-  const L = ({ w, h, r = 8 }: { w: number | string; h: number; r?: number }) => (
-    <Animated.View style={[{ width: w as any, height: h, borderRadius: r, backgroundColor: T.surf }, { opacity: op }]}/>
+  const B = ({ w, h, r = 6 }: { w: number | string; h: number; r?: number }) => (
+    <Animated.View style={{ width: w as any, height: h, borderRadius: r, backgroundColor: FAINT, opacity: op }} />
   );
   return (
-    <View style={{ gap: 14 }}>
-      <View style={{ flexDirection: 'row', gap: 10 }}>
-        {[0, 1, 2, 3].map(i => <Animated.View key={i} style={{ flex: 1, height: 80, borderRadius: 16, backgroundColor: T.navy, opacity: op }}/>)}
-      </View>
+    <View style={{ gap: 12 }}>
       {[0, 1, 2].map(i => (
-        <View key={i} style={{ borderRadius: 20, padding: 16, gap: 12, backgroundColor: T.navy }}>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <Animated.View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: T.surf, opacity: op }}/>
-            <View style={{ flex: 1, gap: 8 }}><L w="65%" h={13}/><L w="40%" h={9}/></View>
-            <L w={52} h={22} r={9}/>
+        <View key={i} style={{ backgroundColor: NAVY, borderRadius: 20, padding: 16, gap: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Animated.View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: FAINT, opacity: op }} />
+            <View style={{ flex: 1, gap: 8 }}>
+              <B w="60%" h={13} />
+              <B w="40%" h={10} />
+            </View>
+            <B w={70} h={24} r={12} />
           </View>
-          <L w="100%" h={4} r={2}/>
-          <View style={{ flexDirection: 'row', gap: 8 }}><L w="45%" h={9}/><L w="35%" h={9}/></View>
+          <B w="100%" h={4} r={2} />
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <B w="45%" h={10} />
+            <B w="35%" h={10} />
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <B w="30%" h={32} r={12} />
+            <B w="30%" h={32} r={12} />
+          </View>
         </View>
       ))}
     </View>
   );
-});
+}
 
 /* ─── Mission Card ───────────────────────────────────────────────────────── */
-const MissionCard = memo(function MissionCard({ m, index, onPress }: {
-  m: Mission; index: number; onPress: () => void;
-}) {
-  const [imgErr, setImgErr] = useState(false);
-  const enter = useRef(new Animated.Value(0)).current;
-  const press = useRef(new Animated.Value(1)).current;
+interface MissionCardProps {
+  mission: Mission;
+  onCheckIn: (id: string) => void;
+  onCheckOut: (id: string, checkInTime: string, hourlyRate: number) => void;
+  onPay: (id: string, amountDue: number) => void;
+}
 
-  useEffect(() => {
-    Animated.timing(enter, {
-      toValue: 1, duration: 360,
-      delay: Math.min(index * 45, 300),
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, []);
-
-  const onPI = () => Animated.spring(press, { toValue: 0.97, tension: 270, friction: 9, useNativeDriver: true }).start();
-  const onPO = () => Animated.spring(press, { toValue: 1,    tension: 220, friction: 12, useNativeDriver: true }).start();
-
-  const pay         = PAY[m.payment_status] ?? PAY.pending;
-  const tc          = typeColor(m.event_type);
-  const init        = m.staff_name.trim().split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  const roles       = Array.isArray(m.staff_role) ? m.staff_role : [];
-  const primaryRole = roles[0] ?? '—';
-
-  const durationStr = m.hours_worked != null
-    ? `${Number(m.hours_worked).toFixed(1)}h`
-    : (m.check_in && m.check_out)
-      ? `${((new Date(m.check_out).getTime() - new Date(m.check_in).getTime()) / 3600000).toFixed(1)}h`
-      : null;
-
-  const paidPct = (m.amount_due && m.amount_due > 0 && m.amount_paid != null)
-    ? Math.min(m.amount_paid / m.amount_due, 1)
-    : 0;
+function MissionCard({ mission: m, onCheckIn, onCheckOut, onPay }: MissionCardProps) {
+  const cfg       = STATUS_CONFIG[m.status] ?? STATUS_CONFIG.pending;
+  const staffName = m.staff_name ?? 'Staff inconnu';
+  const paid      = m.amount_paid ?? 0;
+  const due       = m.amount_due  ?? 0;
+  const paidPct   = due > 0 ? Math.min(paid / due, 1) : 0;
 
   return (
-    <Animated.View style={{
-      opacity: enter,
-      transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }, { scale: press }],
-      marginBottom: 12,
-    }}>
-      <TouchableOpacity
-        style={[mc.card, { borderColor: `${pay.c}20` }]}
-        onPress={onPress} onPressIn={onPI} onPressOut={onPO} activeOpacity={1}
-      >
-        <LinearGradient colors={[`${pay.c}0A`, `${pay.c}03`]} style={StyleSheet.absoluteFillObject}/>
+    <View style={[styles.missionCard, { borderColor: `${cfg.color}25` }]}>
+      <LinearGradient
+        colors={[`${cfg.color}08`, 'transparent']}
+        style={StyleSheet.absoluteFillObject}
+      />
 
-        {/* Event header */}
-        <View style={mc.evtRow}>
-          <View style={[mc.evtIcon, { backgroundColor: `${tc}16`, borderColor: `${tc}28` }]}>
-            <Ionicons name="calendar-outline" size={13} color={tc}/>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={mc.evtTitle} numberOfLines={1}>{m.event_title}</Text>
-            <Text style={{ color: T.muted, fontSize: 10 }}>
-              {fmt(m.event_date)}
-              {m.event_location ? `  ·  ${m.event_location.split(',')[0]}` : ''}
-            </Text>
-          </View>
-          <View style={[mc.payChip, { backgroundColor: `${pay.c}14`, borderColor: `${pay.c}30` }]}>
-            <Ionicons name={pay.icon} size={9} color={pay.c}/>
-            <Text style={{ color: pay.c, fontSize: 9, fontWeight: '800' }}>{pay.l}</Text>
+      {/* Top row: avatar + name/role + status badge */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <Avatar name={staffName} size={38} />
+        <View style={{ flex: 1, gap: 3 }}>
+          <Text style={{ color: WHITE, fontSize: 15, fontWeight: '800', letterSpacing: -0.2 }} numberOfLines={1}>
+            {staffName}
+          </Text>
+          <View style={{
+            alignSelf: 'flex-start', backgroundColor: `${BLUE}18`,
+            paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6,
+          }}>
+            <Text style={{ color: BLUE, fontSize: 11, fontWeight: '700' }}>{m.role || '—'}</Text>
           </View>
         </View>
-
-        {/* Staff row */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 13 }}>
-          {m.staff_avatar && !imgErr
-            ? <Image source={{ uri: m.staff_avatar }} style={mc.avatar} resizeMode="cover" onError={() => setImgErr(true)}/>
-            : <View style={[mc.avatar, mc.avatarFb]}>
-                <Text style={{ color: BLUE, fontSize: 17, fontWeight: '900' }}>{init}</Text>
-              </View>
-          }
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text style={mc.staffName} numberOfLines={1}>{m.staff_name}</Text>
-            <Text style={{ color: BLUE, fontSize: 11, fontWeight: '600' }}>{primaryRole}</Text>
-            {roles.length > 1 && <Text style={{ color: T.muted, fontSize: 10 }}>{roles.slice(1).join('  ·  ')}</Text>}
-          </View>
-          <View style={{ alignItems: 'flex-end', gap: 2 }}>
-            <Text style={{ color: GOLD, fontSize: 20, fontWeight: '900', letterSpacing: -0.5 }}>
-              {fmtMoney(m.amount_due)}
-            </Text>
-            {m.amount_paid != null && m.amount_paid > 0 && (
-              <Text style={{ color: SUCCESS, fontSize: 10, fontWeight: '700' }}>
-                {fmtMoney(m.amount_paid)} payé
-              </Text>
-            )}
-          </View>
+        <View style={[styles.statusBadge, { backgroundColor: cfg.bg, borderColor: `${cfg.color}30`, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+          <Ionicons name={cfg.icon as any} size={10} color={cfg.color}/>
+          <Text style={{ color: cfg.color, fontSize: 10, fontWeight: '800' }}>{cfg.label}</Text>
         </View>
+      </View>
 
-        {/* Time row */}
-        {(m.check_in || m.check_out || durationStr) && (
-          <View style={{ flexDirection: 'row', gap: 14, flexWrap: 'wrap' }}>
-            {m.check_in && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <Ionicons name="log-in-outline" size={12} color={T.muted}/>
-                <Text style={{ color: T.muted, fontSize: 11 }}>{fmtTime(m.check_in)}</Text>
-              </View>
-            )}
-            {m.check_out && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <Ionicons name="log-out-outline" size={12} color={T.muted}/>
-                <Text style={{ color: T.muted, fontSize: 11 }}>{fmtTime(m.check_out)}</Text>
-              </View>
-            )}
-            {durationStr && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <Ionicons name="timer-outline" size={12} color={BLUE}/>
-                <Text style={{ color: BLUE, fontSize: 11, fontWeight: '700' }}>{durationStr}</Text>
-              </View>
-            )}
-          </View>
-        )}
+      {/* Divider */}
+      <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: FAINT }} />
 
-        {/* Payment progress bar */}
-        {m.amount_due != null && m.amount_due > 0 && (
-          <View style={{ gap: 5 }}>
+      {/* Timeline row */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        <Ionicons name="time-outline" size={12} color={MUTED}/>
+        <Text style={{ color: MUTED, fontSize: 12 }}>
+          {fmtDate(m.date_start)}
+        </Text>
+        <Text style={{ color: MUTED, fontSize: 12 }}>
+          {fmtTime(m.date_start)}
+        </Text>
+        <Ionicons name="arrow-forward-outline" size={10} color={MUTED}/>
+        <Text style={{ color: MUTED, fontSize: 12 }}>
+          {fmtTime(m.date_end)}
+        </Text>
+      </View>
+
+      {/* Check-in / check-out times if available */}
+      {(m.check_in_time || m.check_out_time) ? (
+        <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap' }}>
+          {m.check_in_time ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Ionicons name="log-in-outline" size={12} color={BLUE}/>
+              <Text style={{ color: BLUE, fontSize: 11 }}>Arrivée</Text>
+              <Text style={{ color: BLUE, fontSize: 11, fontWeight: '700' }}>{fmtTime(m.check_in_time)}</Text>
+            </View>
+          ) : null}
+          {m.check_out_time ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Ionicons name="log-out-outline" size={12} color={GOLD}/>
+              <Text style={{ color: GOLD, fontSize: 11 }}>Départ</Text>
+              <Text style={{ color: GOLD, fontSize: 11, fontWeight: '700' }}>{fmtTime(m.check_out_time)}</Text>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      {/* Financials */}
+      <View style={{ gap: 6 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <Ionicons name="cash-outline" size={12} color={MUTED}/>
+          <Text style={{ color: MUTED, fontSize: 12 }}>
+            {m.hours_worked != null ? m.hours_worked.toFixed(1) : '—'} h
+            {' × '}
+            {m.hourly_rate != null ? `${m.hourly_rate} €/h` : '—'}
+            {' = '}
+            <Text style={{ color: GOLD, fontWeight: '800' }}>{fmtMoney(due > 0 ? due : null)}</Text>
+          </Text>
+        </View>
+        {due > 0 && (
+          <View style={{ gap: 4 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={{ color: T.muted, fontSize: 10, fontWeight: '600' }}>Paiement</Text>
-              <Text style={{ color: pay.c, fontSize: 10, fontWeight: '800' }}>{Math.round(paidPct * 100)}%</Text>
+              <Text style={{ color: MUTED, fontSize: 11 }}>
+                Payé : {fmtMoney(paid)} / {fmtMoney(due)}
+              </Text>
+              <Text style={{ color: paidPct >= 1 ? GREEN_OK : BLUE, fontSize: 11, fontWeight: '700' }}>
+                {Math.round(paidPct * 100)} %
+              </Text>
             </View>
-            <View style={{ height: 4, borderRadius: 2, backgroundColor: T.faint, overflow: 'hidden' }}>
-              <View style={{ width: `${paidPct * 100}%` as any, height: '100%', borderRadius: 2, backgroundColor: pay.c }}/>
-            </View>
+            <PayBar paid={paid} due={due} />
           </View>
         )}
+      </View>
 
-        {/* Stripe */}
-        {m.stripe_transfer && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Ionicons name="card-outline" size={11} color={T.purple}/>
-            <Text style={{ color: T.purple, fontSize: 10, fontWeight: '600' }}>
-              Stripe: {m.stripe_transfer.slice(0, 20)}…
-            </Text>
-          </View>
-        )}
-
-        {/* Border overlay */}
-        <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-          borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, borderColor: `${pay.c}20` }}/>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-});
-const mc = StyleSheet.create({
-  card    : { borderRadius: 20, overflow: 'hidden', padding: 16, gap: 11, backgroundColor: T.navy },
-  evtRow  : { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  evtIcon : { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  evtTitle: { color: T.white, fontSize: 13, fontWeight: '800', letterSpacing: -0.2 },
-  payChip : { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth },
-  avatar  : { width: 44, height: 44, borderRadius: 13, backgroundColor: T.navy },
-  avatarFb: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(26,159,227,0.12)', borderWidth: 1.5, borderColor: T.border },
-  staffName: { color: T.white, fontSize: 14, fontWeight: '900', letterSpacing: -0.2 },
-});
-
-/* ─── SCREEN ─────────────────────────────────────────────────────────────── */
-export default function MissionsScreen() {
-  const router = useRouter();
-
-  const [missions,    setMissions]    = useState<Mission[]>([]);
-  const [loading,     setLoading]     = useState(true);
-  const [refreshing,  setRefreshing]  = useState(false);
-  const [tab,         setTab]         = useState<PayStatus | 'all'>('all');
-  const [lastUpdated, setLastUpdated] = useState(new Date());
-
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    try {
-      const uid = await getWorkingUid();
-      if (!uid) { setMissions([]); return; }
-
-      const { data: evts } = await supabase.from('events')
-        .select('id,title,date_start,location,type,status,organizer_id')
-        .eq('organizer_id', uid);
-      if (!evts?.length) { setMissions([]); setLoading(false); setRefreshing(false); return; }
-
-      const evtIds = evts.map((e: any) => e.id);
-      const { data: raw, error } = await supabase.from('missions')
-        .select('id,application_id,staff_id,event_id,check_in,check_out,hours_worked,amount_due,amount_paid,payment_status,stripe_transfer,created_at')
-        .in('event_id', evtIds)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      if (!raw?.length) { setMissions([]); return; }
-
-      const staffIds = [...new Set((raw as any[]).map((m: any) => m.staff_id).filter(Boolean))];
-      const { data: staffRows } = staffIds.length
-        ? await supabase.from('staff').select('id,display_name,avatar_url,role').in('id', staffIds)
-        : { data: [] };
-
-      const sm = Object.fromEntries((staffRows ?? []).map((s: any) => [s.id, s]));
-      const em = Object.fromEntries(evts.map((e: any) => [e.id, e]));
-
-      setMissions((raw as any[]).map(m => {
-        const st = sm[m.staff_id] ?? {};
-        const ev = em[m.event_id] ?? {};
-        return {
-          ...m,
-          payment_status: (m.payment_status ?? 'pending') as PayStatus,
-          staff_name    : st.display_name ?? 'Staff inconnu',
-          staff_avatar  : st.avatar_url ?? null,
-          staff_role    : st.role ?? [],
-          event_title   : ev.title ?? '—',
-          event_date    : ev.date_start ?? '',
-          event_location: ev.location ?? '',
-          event_type    : ev.type ?? null,
-          event_status  : ev.status ?? '',
-        };
-      }));
-      setLastUpdated(new Date());
-    } catch (e) { console.error('[missions]', e); }
-    finally { setLoading(false); setRefreshing(false); }
-  }, []);
-
-  useEffect(() => { load(); }, []);
-
-  useEffect(() => {
-    let mounted = true;
-    const ch = supabase.channel(`missions_rt_${Date.now()}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'missions' },
-        () => { if (mounted) load(true); })
-      .subscribe();
-    return () => { mounted = false; supabase.removeChannel(ch); };
-  }, [load]);
-
-  const filtered = useMemo(() => {
-    if (tab === 'all') return missions;
-    return missions.filter(m => m.payment_status === tab);
-  }, [missions, tab]);
-
-  const kpis = useMemo(() => ({
-    total     : missions.length,
-    totalDue  : missions.reduce((s, m) => s + (m.amount_due  ?? 0), 0),
-    totalPaid : missions.reduce((s, m) => s + (m.amount_paid ?? 0), 0),
-    totalHours: missions.reduce((s, m) => s + (m.hours_worked ?? 0), 0),
-    pending   : missions.filter(m => m.payment_status === 'pending').length,
-    paid      : missions.filter(m => m.payment_status === 'paid').length,
-  }), [missions]);
-
-  const TABS: [PayStatus | 'all', string, number][] = [
-    ['all',     'Toutes',      missions.length],
-    ['pending', 'En attente',  missions.filter(m => m.payment_status === 'pending').length],
-    ['paid',    'Payées',      missions.filter(m => m.payment_status === 'paid').length],
-    ['partial', 'Partielles',  missions.filter(m => m.payment_status === 'partial').length],
-  ];
-
-  const lastStr = lastUpdated.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-
-  const renderItem = useCallback(({ item, index }: { item: Mission; index: number }) => (
-    <MissionCard m={item} index={index}
-      onPress={() => router.push({ pathname: '/(organizer)/mission/[id]', params: { id: item.id } } as any)}
-    />
-  ), [router]);
-  const keyExtractor = useCallback((m: Mission) => `m_${m.id}`, []);
-
-  return (
-    <View style={{ flex: 1, backgroundColor: BG }}>
-      <ParticleBg/>
-      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-
-        {/* ── NAV ── */}
-        <View style={ds.nav}>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text style={ds.greet}>Gestion</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Text style={ds.title}>Missions</Text>
-              <LiveDot/>
-            </View>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 9 }}>
+      {/* Action buttons */}
+      {(m.status === 'confirmed' || m.status === 'in_progress' ||
+        (m.status === 'completed' && paid < due)) ? (
+        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+          {m.status === 'confirmed' && (
             <TouchableOpacity
-              style={ds.navBtn}
-              onPress={() => router.push('/(organizer)/applications' as any)}
+              style={[styles.actionBtn, { backgroundColor: 'rgba(26,159,227,0.15)', borderColor: `${BLUE}40`, flexDirection: 'row', alignItems: 'center', gap: 5 }]}
+              onPress={() => onCheckIn(m.id)}
               activeOpacity={0.78}
             >
-              <Ionicons name="document-text-outline" size={17} color={T.muted}/>
+              <Ionicons name="log-in-outline" size={13} color={BLUE}/>
+              <Text style={{ color: BLUE, fontSize: 12, fontWeight: '800' }}>Check-in</Text>
             </TouchableOpacity>
+          )}
+          {m.status === 'in_progress' && (
             <TouchableOpacity
-              style={[ds.navBtn, { backgroundColor: 'rgba(26,159,227,0.15)', borderColor: T.borderHi }]}
-              onPress={() => router.push('/(organizer)/create-event' as any)}
-              activeOpacity={0.82}
+              style={[styles.actionBtn, { backgroundColor: 'rgba(26,159,227,0.12)', borderColor: `${GOLD}40`, flexDirection: 'row', alignItems: 'center', gap: 5 }]}
+              onPress={() => onCheckOut(m.id, m.check_in_time ?? new Date().toISOString(), m.hourly_rate)}
+              activeOpacity={0.78}
             >
-              <Ionicons name="add" size={20} color={BLUE}/>
+              <Ionicons name="log-out-outline" size={13} color={GOLD}/>
+              <Text style={{ color: GOLD, fontSize: 12, fontWeight: '800' }}>Check-out</Text>
             </TouchableOpacity>
-          </View>
+          )}
+          {m.status === 'completed' && paid < due && (
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: 'rgba(26,159,227,0.15)', borderColor: `${BLUE}40`, flexDirection: 'row', alignItems: 'center', gap: 5 }]}
+              onPress={() => onPay(m.id, due)}
+              activeOpacity={0.78}
+            >
+              <Ionicons name="card-outline" size={13} color={BLUE}/>
+              <Text style={{ color: BLUE, fontSize: 12, fontWeight: '800' }}>Marquer payé</Text>
+            </TouchableOpacity>
+          )}
         </View>
+      ) : null}
 
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 130, paddingHorizontal: EDGE, gap: 14 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={BLUE}/>}
-        >
-          {/* Timestamp */}
-          <Text style={{ color: T.faint, fontSize: 9, fontWeight: '600', textAlign: 'right', letterSpacing: 0.3 }}>
-            Mis à jour à {lastStr}
-          </Text>
-
-          {loading ? <Skeleton/> : (<>
-
-            {/* ── KPI STRIP ── */}
-            <View style={ds.kpiRow}>
-              {[
-                { l: 'Missions\ntotales',    v: kpis.total,      c: T.white, icon: 'briefcase-outline'       as const },
-                { l: 'En attente\npaiement', v: kpis.pending,    c: T.amber, icon: 'time-outline'             as const },
-                { l: 'Heures\ntravaillées',  v: kpis.totalHours, c: T.blue,  icon: 'timer-outline'            as const, dec: 1 },
-                { l: 'Payées',               v: kpis.paid,       c: BLUE,   icon: 'checkmark-circle-outline' as const },
-              ].map(({ l, v, c, icon, dec }) => (
-                <View key={l} style={[ds.kpiCard, { borderColor: `${c}20` }]}>
-                  <LinearGradient colors={[`${c}12`, `${c}04`]} style={StyleSheet.absoluteFillObject}/>
-                  <Ionicons name={icon} size={15} color={c}/>
-                  <Counter value={v} color={c} size={20} decimals={dec ?? 0}/>
-                  <Text style={{ color: T.muted, fontSize: 9, fontWeight: '700', textAlign: 'center', lineHeight: 12 }}>{l}</Text>
-                  <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                    borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: `${c}20` }}/>
-                </View>
-              ))}
-            </View>
-
-            {/* ── FINANCE CARD ── */}
-            {kpis.total > 0 && (
-              <Card glow={GOLD}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={ds.cardTitle}>Finances</Text>
-                  <TrendBadge curr={kpis.totalPaid} prev={kpis.totalDue * 0.5}/>
-                </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <View style={{ alignItems: 'center', gap: 2 }}>
-                    <Counter value={kpis.totalDue} suffix="€" color={GOLD} size={22}/>
-                    <Text style={{ color: T.muted, fontSize: 9, fontWeight: '700' }}>DÛ</Text>
-                  </View>
-                  <View style={{ alignItems: 'center', gap: 2 }}>
-                    <Counter value={kpis.totalPaid} suffix="€" color={SUCCESS} size={22}/>
-                    <Text style={{ color: T.muted, fontSize: 9, fontWeight: '700' }}>PAYÉ</Text>
-                  </View>
-                  <View style={{ alignItems: 'center', gap: 2 }}>
-                    <Counter value={Math.max(kpis.totalDue - kpis.totalPaid, 0)} suffix="€" color={T.amber} size={22}/>
-                    <Text style={{ color: T.muted, fontSize: 9, fontWeight: '700' }}>RESTANT</Text>
-                  </View>
-                </View>
-                <ProgBar
-                  value={kpis.totalPaid}
-                  max={Math.max(kpis.totalDue, 1)}
-                  color={SUCCESS}
-                  label="Taux de paiement"
-                  right={`${kpis.totalDue > 0 ? Math.round(kpis.totalPaid / kpis.totalDue * 100) : 0}%`}
-                />
-              </Card>
-            )}
-
-            {/* ── FILTER TABS ── */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8, paddingBottom: 2 }}>
-              {TABS.map(([k, l, n]) => (
-                <TouchableOpacity
-                  key={k}
-                  style={[
-                    ds.chip,
-                    tab === k
-                      ? { backgroundColor: 'rgba(26,159,227,0.12)', borderColor: T.borderHi }
-                      : { backgroundColor: T.surf, borderColor: T.border },
-                  ]}
-                  onPress={() => setTab(k)}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[ds.chipTxt, tab === k && { color: BLUE, fontWeight: '800' }]}>{l}</Text>
-                  {n > 0 && (
-                    <Text style={{ color: tab === k ? BLUE : T.faint, fontSize: 11, fontWeight: '700' }}> {n}</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            {/* ── LIST ── */}
-            {filtered.length === 0 ? (
-              <View style={{ alignItems: 'center', paddingTop: 72, gap: 14 }}>
-                <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(26,159,227,0.12)',
-                  alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: T.border }}>
-                  <Ionicons name="briefcase-outline" size={38} color="rgba(26,159,227,0.4)"/>
-                </View>
-                <Text style={{ color: T.white, fontSize: 17, fontWeight: '900', letterSpacing: -0.3 }}>
-                  {tab === 'all'     ? 'Aucune mission créée'        :
-                   tab === 'pending' ? 'Aucun paiement en attente'   :
-                   tab === 'paid'    ? 'Aucune mission payée'         : 'Aucune mission'}
-                </Text>
-                <Text style={{ color: T.muted, fontSize: 13, textAlign: 'center', lineHeight: 20 }}>
-                  {tab === 'all'
-                    ? "Créez un événement et publiez une mission\npour démarrer le recrutement."
-                    : "Changez d'onglet pour voir d'autres missions."}
-                </Text>
-                {tab === 'all' && (
-                  <TouchableOpacity
-                    style={{ paddingHorizontal: 22, paddingVertical: 12, borderRadius: 14,
-                             backgroundColor: BLUE, shadowColor: BLUE, shadowOffset: { width: 0, height: 3 },
-                             shadowOpacity: 0.35, shadowRadius: 8, elevation: 5 }}
-                    onPress={() => router.push('/(organizer)/create-event' as any)}
-                    activeOpacity={0.82}
-                  >
-                    <Text style={{ color: BG, fontWeight: '800', fontSize: 13 }}>+ Créer une mission</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            ) : (
-              <FlatList
-                data={filtered}
-                keyExtractor={keyExtractor}
-                renderItem={renderItem}
-                scrollEnabled={false}
-                ListFooterComponent={<View style={{ height: 14 }}/>}
-              />
-            )}
-
-          </>)}
-        </ScrollView>
-      </SafeAreaView>
+      {/* Card border overlay */}
+      <View pointerEvents="none" style={{
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, borderColor: `${cfg.color}25`,
+      }} />
     </View>
   );
 }
 
+/* ─── Section Header ─────────────────────────────────────────────────────── */
+function EventSectionHeader({ event }: { event: EventRow | undefined }) {
+  if (!event) return null;
+  const tc = typeColor(event.type);
+  return (
+    <View style={styles.sectionHeader}>
+      <LinearGradient
+        colors={[`${tc}10`, 'transparent']}
+        style={StyleSheet.absoluteFillObject}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+      />
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: WHITE, fontSize: 15, fontWeight: '800', letterSpacing: -0.2 }} numberOfLines={1}>
+          {event.title}
+        </Text>
+        <Text style={{ color: MUTED, fontSize: 12, marginTop: 2 }}>
+          {fmtDate(event.date_start)}
+        </Text>
+      </View>
+      {event.type ? (
+        <View style={{
+          backgroundColor: `${tc}18`, borderRadius: 8, paddingHorizontal: 10,
+          paddingVertical: 4, borderWidth: StyleSheet.hairlineWidth, borderColor: `${tc}35`,
+        }}>
+          <Text style={{ color: tc, fontSize: 11, fontWeight: '700' }}>{event.type}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/* ─── KPI Chip ───────────────────────────────────────────────────────────── */
+interface KpiChipProps {
+  icon: string;
+  label: string;
+  value: string;
+  color: string;
+  pulse?: boolean;
+}
+function KpiChip({ icon, label, value, color, pulse }: KpiChipProps) {
+  return (
+    <View style={[styles.kpiChip, { borderColor: `${color}30` }]}>
+      <LinearGradient colors={[`${color}14`, `${color}05`]} style={StyleSheet.absoluteFillObject} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}>
+        {pulse ? <PulseDot color={color} /> : null}
+        <Ionicons name={icon as any} size={14} color={color}/>
+      </View>
+      <Text style={{ color, fontSize: 18, fontWeight: '900', letterSpacing: -0.5 }}>{value}</Text>
+      <Text style={{ color: MUTED, fontSize: 10, fontWeight: '600', textAlign: 'center', marginTop: 2 }}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+/* ─── Filter tab type ────────────────────────────────────────────────────── */
+interface TabDef { key: FilterTab; label: string }
+
+const FILTER_TABS: TabDef[] = [
+  { key: 'all',         label: 'Toutes'      },
+  { key: 'in_progress', label: 'En cours'    },
+  { key: 'confirmed',   label: 'Confirmées'  },
+  { key: 'pending',     label: 'En attente'  },
+  { key: 'completed',   label: 'Complétées'  },
+  { key: 'cancelled',   label: 'Annulées'    },
+];
+
+/* ─── Main Screen ────────────────────────────────────────────────────────── */
+export default function MissionsScreen() {
+  const router    = useRouter();
+  const insets    = useSafeAreaInsets();
+
+  const [allMissions, setAllMissions] = useState<Mission[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [refreshing,  setRefreshing]  = useState(false);
+  const [activeTab,   setActiveTab]   = useState<FilterTab>('all');
+
+  /* ── Data fetching ─────────────────────────────────────────────────────── */
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const orgId = await getWorkingOrganizerId();
+      if (!orgId) { setAllMissions([]); return; }
+
+      const { data: events } = await supabase
+        .from('events')
+        .select('id,title,type,date_start')
+        .eq('organizer_id', orgId);
+
+      const eventIds = (events ?? []).map((e: any) => e.id as string);
+
+      if (eventIds.length === 0) { setAllMissions([]); return; }
+
+      const { data: missions, error } = await supabase
+        .from('missions')
+        .select('*, staff:staff_id(display_name)')
+        .in('event_id', eventIds)
+        .order('date_start', { ascending: true });
+
+      if (error) throw error;
+
+      const missionsFull: Mission[] = (missions ?? []).map((m: any) => ({
+        id:             m.id,
+        application_id: m.application_id ?? null,
+        event_id:       m.event_id,
+        staff_id:       m.staff_id,
+        role:           m.role ?? '',
+        date_start:     m.date_start,
+        date_end:       m.date_end,
+        status:         (m.status ?? 'pending') as MissionStatus,
+        hourly_rate:    m.hourly_rate ?? 0,
+        hours_worked:   m.hours_worked ?? null,
+        amount_due:     m.amount_due ?? null,
+        amount_paid:    m.amount_paid ?? null,
+        check_in_time:  m.check_in_time ?? null,
+        check_out_time: m.check_out_time ?? null,
+        notes:          m.notes ?? null,
+        event:          (events ?? []).find((e: any) => e.id === m.event_id) as EventRow | undefined,
+        staff_name:     m.staff?.display_name ?? 'Staff inconnu',
+      }));
+
+      setAllMissions(missionsFull);
+    } catch (err) {
+      console.error('[missions] load error:', err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  /* ── Real-time subscription ────────────────────────────────────────────── */
+  useEffect(() => {
+    let mounted = true;
+    const channel = supabase
+      .channel(`missions_realtime_${Date.now()}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'missions' }, () => {
+        if (mounted) load(true);
+      })
+      .subscribe();
+    return () => { mounted = false; supabase.removeChannel(channel); };
+  }, [load]);
+
+  /* ── Actions ───────────────────────────────────────────────────────────── */
+  const handleCheckIn = useCallback(async (missionId: string) => {
+    const now = new Date().toISOString();
+    setAllMissions(prev =>
+      prev.map(m => m.id === missionId
+        ? { ...m, status: 'in_progress' as MissionStatus, check_in_time: now }
+        : m
+      )
+    );
+    try {
+      await supabase
+        .from('missions')
+        .update({ status: 'in_progress', check_in_time: now })
+        .eq('id', missionId);
+    } catch (err) {
+      console.error('[missions] check-in error:', err);
+    }
+  }, []);
+
+  const handleCheckOut = useCallback(async (
+    missionId: string,
+    checkInTime: string,
+    hourlyRate: number,
+  ) => {
+    const now         = new Date().toISOString();
+    const hoursWorked = (new Date(now).getTime() - new Date(checkInTime).getTime()) / 3_600_000;
+    const amountDue   = Math.round(hoursWorked * hourlyRate * 100) / 100;
+    setAllMissions(prev =>
+      prev.map(m => m.id === missionId
+        ? {
+            ...m,
+            status:         'completed' as MissionStatus,
+            check_out_time: now,
+            hours_worked:   hoursWorked,
+            amount_due:     amountDue,
+          }
+        : m
+      )
+    );
+    try {
+      await supabase
+        .from('missions')
+        .update({ status: 'completed', check_out_time: now, hours_worked: hoursWorked, amount_due: amountDue })
+        .eq('id', missionId);
+    } catch (err) {
+      console.error('[missions] check-out error:', err);
+    }
+  }, []);
+
+  const handlePay = useCallback(async (missionId: string, amountDue: number) => {
+    setAllMissions(prev =>
+      prev.map(m => m.id === missionId ? { ...m, amount_paid: amountDue } : m)
+    );
+    try {
+      await supabase
+        .from('missions')
+        .update({ amount_paid: amountDue })
+        .eq('id', missionId);
+    } catch (err) {
+      console.error('[missions] pay error:', err);
+    }
+  }, []);
+
+  /* ── Derived data ──────────────────────────────────────────────────────── */
+  const filtered = useMemo<Mission[]>(() => {
+    if (activeTab === 'all') return allMissions;
+    return allMissions.filter(m => m.status === activeTab);
+  }, [allMissions, activeTab]);
+
+  const sections = useMemo<Section[]>(() => {
+    const map = new Map<string, Mission[]>();
+    for (const m of filtered) {
+      if (!map.has(m.event_id)) map.set(m.event_id, []);
+      map.get(m.event_id)!.push(m);
+    }
+    return Array.from(map.entries()).map(([eventId, data]) => ({
+      eventId,
+      event: data[0]?.event,
+      data,
+    }));
+  }, [filtered]);
+
+  const kpis = useMemo(() => {
+    const active      = allMissions.filter(m => m.status === 'in_progress' || m.status === 'confirmed').length;
+    const completed   = allMissions.filter(m => m.status === 'completed').length;
+    const unpaidTotal = allMissions.reduce((sum, m) => {
+      const due  = m.amount_due  ?? 0;
+      const paid = m.amount_paid ?? 0;
+      return sum + Math.max(due - paid, 0);
+    }, 0);
+    return { active, completed, unpaidTotal };
+  }, [allMissions]);
+
+  const tabCounts = useMemo<Record<FilterTab, number>>(() => {
+    const counts: Record<FilterTab, number> = {
+      all: allMissions.length,
+      pending:     0, confirmed: 0, in_progress: 0, completed: 0, cancelled: 0,
+    };
+    for (const m of allMissions) {
+      counts[m.status] = (counts[m.status] ?? 0) + 1;
+    }
+    return counts;
+  }, [allMissions]);
+
+  /* ── Render helpers ────────────────────────────────────────────────────── */
+  const renderItem = useCallback(({ item }: { item: Mission }) => (
+    <MissionCard
+      mission={item}
+      onCheckIn={handleCheckIn}
+      onCheckOut={handleCheckOut}
+      onPay={handlePay}
+    />
+  ), [handleCheckIn, handleCheckOut, handlePay]);
+
+  const renderSectionHeader = useCallback(({ section }: { section: Section }) => (
+    <EventSectionHeader event={section.event} />
+  ), []);
+
+  const keyExtractor = useCallback((item: Mission) => item.id, []);
+
+  /* ── Header ────────────────────────────────────────────────────────────── */
+  const ListHeader = useMemo(() => (
+    <>
+      {/* Page title */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <View style={{ gap: 2 }}>
+          <Text style={{ color: MUTED, fontSize: 12, fontWeight: '600' }}>Gestion des</Text>
+          <Text style={{ color: WHITE, fontSize: 26, fontWeight: '900', letterSpacing: -0.6 }}>Missions</Text>
+        </View>
+        <TouchableOpacity
+          style={{
+            width: 40, height: 40, borderRadius: 13,
+            backgroundColor: FAINT, borderWidth: StyleSheet.hairlineWidth,
+            borderColor: `${BLUE}25`, alignItems: 'center', justifyContent: 'center',
+          }}
+          onPress={() => router.push('/(organizer)/applications' as any)}
+          activeOpacity={0.78}
+        >
+          <Ionicons name="document-text-outline" size={18} color={BLUE}/>
+        </TouchableOpacity>
+      </View>
+
+      {/* KPI chips */}
+      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+        <KpiChip
+          icon="cash-outline"
+          label="À payer"
+          value={kpis.unpaidTotal > 0 ? `${Math.round(kpis.unpaidTotal)} €` : '—'}
+          color={GOLD}
+        />
+        <KpiChip
+          icon="flash-outline"
+          label="Actives"
+          value={String(kpis.active)}
+          color={BLUE}
+          pulse={kpis.active > 0}
+        />
+        <KpiChip
+          icon="checkmark-circle-outline"
+          label="Complétées"
+          value={String(kpis.completed)}
+          color={GREEN_OK}
+        />
+      </View>
+
+      {/* Filter tabs — horizontal scroll via ScrollView inside a fixed-height View */}
+      <View style={{ marginBottom: 16 }}>
+        <FilterTabsRow
+          tabs={FILTER_TABS}
+          activeTab={activeTab}
+          tabCounts={tabCounts}
+          onPress={setActiveTab}
+        />
+      </View>
+
+      {/* Skeleton while loading */}
+      {loading && <Skeleton />}
+    </>
+  ), [kpis, activeTab, tabCounts, loading, router]);
+
+  /* ── Empty state ───────────────────────────────────────────────────────── */
+  const ListEmpty = useMemo(() => {
+    if (loading) return null;
+    return (
+      <View style={{ alignItems: 'center', paddingTop: 60, gap: 14 }}>
+        <View style={{
+          width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(26,159,227,0.12)',
+          alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: `${BLUE}30`,
+        }}>
+          <Ionicons name="flash-outline" size={36} color={BLUE}/>
+        </View>
+        <Text style={{ color: WHITE, fontSize: 17, fontWeight: '900', letterSpacing: -0.3 }}>
+          Aucune mission
+        </Text>
+        <Text style={{ color: MUTED, fontSize: 13, textAlign: 'center', lineHeight: 20 }}>
+          {activeTab === 'all'
+            ? 'Créez un événement et affectez du staff\npour générer vos premières missions.'
+            : 'Aucune mission ne correspond à ce filtre.'}
+        </Text>
+        {activeTab === 'all' && (
+          <TouchableOpacity
+            style={{
+              paddingHorizontal: 22, paddingVertical: 12, borderRadius: 14,
+              backgroundColor: BLUE, shadowColor: BLUE,
+              shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 10, elevation: 5,
+            }}
+            onPress={() => router.push('/(organizer)/create-event' as any)}
+            activeOpacity={0.82}
+          >
+            <Text style={{ color: BG, fontWeight: '800', fontSize: 13 }}>+ Créer un événement</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  }, [loading, activeTab, router]);
+
+  /* ── Main render ───────────────────────────────────────────────────────── */
+  return (
+    <View style={{ flex: 1, backgroundColor: BG }}>
+      <StatusBar barStyle="light-content" />
+      <ParticleBg />
+
+      <SectionList<Mission, Section>
+        sections={sections}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        renderSectionHeader={renderSectionHeader}
+        stickySectionHeadersEnabled={false}
+        contentContainerStyle={{backgroundColor:'#050E1B',flexGrow:1,
+          paddingTop: insets.top + 12,
+          paddingBottom: insets.bottom + 120,
+          paddingHorizontal: 16,
+        }}
+        ListHeaderComponent={ListHeader}
+        ListEmptyComponent={ListEmpty}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => { setRefreshing(true); load(true); }}
+            tintColor={BLUE}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+        SectionSeparatorComponent={() => <View style={{ height: 4 }} />}
+        ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+      />
+    </View>
+  );
+}
+
+/* ─── Filter tabs row (extracted to avoid hook-in-callback issues) ────────── */
+interface FilterTabsRowProps {
+  tabs: TabDef[];
+  activeTab: FilterTab;
+  tabCounts: Record<FilterTab, number>;
+  onPress: (k: FilterTab) => void;
+}
+function FilterTabsRow({ tabs, activeTab, tabCounts, onPress }: FilterTabsRowProps) {
+  return (
+    <SectionList<TabDef, { data: TabDef[] }>
+      horizontal
+      sections={[{ data: tabs }]}
+      keyExtractor={item => item.key}
+      renderItem={({ item: tab }) => {
+        const isActive = activeTab === tab.key;
+        const count    = tabCounts[tab.key];
+        return (
+          <TouchableOpacity
+            style={[
+              styles.filterTab,
+              isActive
+                ? { backgroundColor: 'rgba(26,159,227,0.14)', borderColor: `${BLUE}60` }
+                : { backgroundColor: FAINT, borderColor: 'transparent' },
+            ]}
+            onPress={() => onPress(tab.key)}
+            activeOpacity={0.75}
+          >
+            <Text style={[styles.filterTabText, isActive && { color: BLUE, fontWeight: '800' }]}>
+              {tab.label}
+            </Text>
+            {count > 0 && (
+              <View style={{
+                backgroundColor: isActive ? `${BLUE}25` : `${MUTED}30`,
+                borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1, marginLeft: 4,
+              }}>
+                <Text style={{ color: isActive ? BLUE : MUTED, fontSize: 10, fontWeight: '700' }}>
+                  {count}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        );
+      }}
+      renderSectionHeader={() => null}
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{backgroundColor:'#050E1B',flexGrow:1, gap: 8, paddingBottom: 2 }}
+    />
+  );
+}
+
 /* ─── Styles ─────────────────────────────────────────────────────────────── */
-const ds = StyleSheet.create({
-  nav     : { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-              paddingHorizontal: EDGE, paddingVertical: 12, paddingBottom: 8 },
-  greet   : { color: T.muted, fontSize: 12, fontWeight: '600' },
-  title   : { color: T.white, fontSize: 20, fontWeight: '900', letterSpacing: -0.4 },
-  navBtn  : { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
-              backgroundColor: T.surf, borderWidth: StyleSheet.hairlineWidth, borderColor: T.border },
-  kpiRow  : { flexDirection: 'row', gap: 10 },
-  kpiCard : { flex: 1, borderRadius: 16, overflow: 'hidden', padding: 13, gap: 6, alignItems: 'center', backgroundColor: T.navy },
-  cardTitle: { color: T.white, fontSize: 14, fontWeight: '900', letterSpacing: -0.2 },
-  chip    : { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, paddingVertical: 7,
-              borderRadius: 22, borderWidth: StyleSheet.hairlineWidth },
-  chipTxt : { color: T.muted, fontSize: 12, fontWeight: '600' },
+const styles = StyleSheet.create({
+  missionCard: {
+    backgroundColor: NAVY,
+    borderRadius: 18,
+    padding: 16,
+    gap: 12,
+    overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  actionBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: `${NAVY}CC`,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10,
+    marginTop: 8,
+    gap: 12,
+    overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: FAINT,
+  },
+  kpiChip: {
+    flex: 1,
+    backgroundColor: NAVY,
+    borderRadius: 16,
+    padding: 14,
+    alignItems: 'center',
+    gap: 2,
+    overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  filterTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  filterTabText: {
+    color: MUTED,
+    fontSize: 12,
+    fontWeight: '600',
+  },
 });

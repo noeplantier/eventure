@@ -11,6 +11,7 @@ import {
   Text, TouchableOpacity, View,
 } from 'react-native';
 import { LinearGradient }            from 'expo-linear-gradient';
+import { Ionicons }                  from '@expo/vector-icons';
 import { useSafeAreaInsets }         from 'react-native-safe-area-context';
 import { useRouter }                 from 'expo-router';
 import { supabase }                  from '@/lib/supabase';
@@ -19,41 +20,39 @@ import { getWorkingOrganizerId }     from '@/lib/mockUser';
 /* ─── Design tokens ──────────────────────────────────────────────────────── */
 const BG    = '#050E1B';
 const BLUE  = '#1A9FE3';
-const CYAN  = '#38BDF8';
-const GOLD  = '#F5C842';
 const NAVY  = '#0C1A30';
 const WHITE = '#FFFFFF';
 const MUTED = 'rgba(255,255,255,0.55)';
 const FAINT = 'rgba(255,255,255,0.08)';
 const EDGE  = 18;
 
-/* ─── Event-type colours (gradient covers) ───────────────────────────────── */
+/* ─── Event-type colours (gradient covers) — 2 blues + white only ────────── */
 const TYPE_COLORS: Record<string, [string, string]> = {
-  'Techno':     ['#1A0836', '#7C3AED'],
-  'House':      ['#031A2E', '#1A9FE3'],
-  'Rock':       ['#1A0808', '#EF4444'],
-  'Festival':   ['#0F0A00', '#F59E0B'],
-  'Gala':       ['#0A0A0F', '#8B5CF6'],
-  'Conférence': ['#001A1A', '#0D9488'],
+  'Techno':     ['#060D1E', '#1A9FE3'],
+  'House':      ['#050E1B', '#1A9FE3'],
+  'Rock':       ['#1A0808', 'rgba(255,255,255,0.45)'],
+  'Festival':   ['#0F0A00', 'rgba(255,255,255,0.65)'],
+  'Gala':       ['#0A0A0F', '#1A9FE3'],
+  'Conférence': ['#001A1A', '#1A9FE3'],
 };
 const DEFAULT_COLORS: [string, string] = ['#0A1628', '#1A9FE3'];
 
-const TYPE_ICONS: Record<string, string> = {
-  'Techno':     '⚡',
-  'House':      '🎵',
-  'Rock':       '🎸',
-  'Festival':   '🎪',
-  'Gala':       '✨',
-  'Conférence': '🎤',
+const TYPE_ICONS: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
+  'Techno':     'flash-outline',
+  'House':      'musical-notes-outline',
+  'Rock':       'musical-note-outline',
+  'Festival':   'ribbon-outline',
+  'Gala':       'sparkles-outline',
+  'Conférence': 'mic-outline',
 };
 
-/* ─── Status badge config ────────────────────────────────────────────────── */
+/* ─── Status badge config (blanc + bleu uniquement) ─────────────────────── */
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  published : { label: 'PUBLIÉ',    color: '#10B981', bg: 'rgba(16,185,129,0.18)' },
-  draft     : { label: 'BROUILLON', color: '#94A3B8', bg: 'rgba(148,163,184,0.15)' },
-  ongoing   : { label: 'EN COURS',  color: '#F59E0B', bg: 'rgba(245,158,11,0.18)' },
-  completed : { label: 'TERMINÉ',   color: '#60A5FA', bg: 'rgba(96,165,250,0.18)' },
-  cancelled : { label: 'ANNULÉ',    color: '#EF4444', bg: 'rgba(239,68,68,0.18)'  },
+  published : { label: 'PUBLIÉ',    color: WHITE,                    bg: 'rgba(26,159,227,0.22)' },
+  draft     : { label: 'BROUILLON', color: 'rgba(255,255,255,0.45)', bg: 'rgba(255,255,255,0.07)' },
+  ongoing   : { label: 'EN COURS',  color: WHITE,                    bg: 'rgba(26,159,227,0.18)' },
+  completed : { label: 'TERMINÉ',   color: 'rgba(255,255,255,0.60)', bg: 'rgba(255,255,255,0.08)' },
+  cancelled : { label: 'ANNULÉ',    color: 'rgba(255,255,255,0.35)', bg: 'rgba(255,255,255,0.05)' },
 };
 
 /* ─── Filter chips ───────────────────────────────────────────────────────── */
@@ -101,8 +100,8 @@ function formatBudget(n: number): string {
 /* ─── Particle Background ────────────────────────────────────────────────── */
 const NUM_P = 28;
 const PCOLS = [
-  '#1A9FE3', 'rgba(26,159,227,0.4)', '#38BDF8',
-  'rgba(56,189,248,0.32)', 'rgba(255,255,255,0.16)',
+  '#1A9FE3', 'rgba(26,159,227,0.4)', '#1A9FE3',
+  'rgba(26,159,227,0.32)', 'rgba(255,255,255,0.16)',
 ];
 const PARTS = Array.from({ length: NUM_P }, (_, i) => ({
   x: (Math.sin(i * 2.39996) * 0.5 + 0.5) * 100,
@@ -183,9 +182,9 @@ interface EventCardProps {
   onView: (id: string) => void;
 }
 const EventCard = memo(function EventCard({ event, onEdit, onView }: EventCardProps) {
-  const colors = TYPE_COLORS[event.type] ?? DEFAULT_COLORS;
-  const icon   = TYPE_ICONS[event.type]  ?? '🎉';
-  const status = STATUS_CONFIG[event.status] ?? STATUS_CONFIG.draft;
+  const colors     = TYPE_COLORS[event.type] ?? DEFAULT_COLORS;
+  const iconName   = TYPE_ICONS[event.type]  ?? 'calendar-outline';
+  const status     = STATUS_CONFIG[event.status] ?? STATUS_CONFIG.draft;
 
   return (
     <View style={ec.card}>
@@ -198,7 +197,7 @@ const EventCard = memo(function EventCard({ event, onEdit, onView }: EventCardPr
           style={StyleSheet.absoluteFill}
         />
         {/* Type icon */}
-        <Text style={ec.typeIcon}>{icon}</Text>
+        <Ionicons name={iconName} size={40} color="white" style={ec.typeIcon}/>
         {/* Status badge */}
         <View style={[ec.statusBadge, { backgroundColor: status.bg }]}>
           <Text style={[ec.statusText, { color: status.color }]}>{status.label}</Text>
@@ -214,12 +213,12 @@ const EventCard = memo(function EventCard({ event, onEdit, onView }: EventCardPr
         <Text style={ec.title} numberOfLines={1}>{event.title}</Text>
 
         <View style={ec.metaRow}>
-          <Text style={ec.metaIcon}>📅</Text>
+          <Ionicons name="calendar-outline" size={12} color={MUTED}/>
           <Text style={ec.metaText}>{formatEventDate(event.date_start)}</Text>
         </View>
 
         <View style={ec.metaRow}>
-          <Text style={ec.metaIcon}>📍</Text>
+          <Ionicons name="location-outline" size={12} color={MUTED}/>
           <Text style={ec.metaText} numberOfLines={1}>{event.location || '—'}</Text>
         </View>
 
@@ -231,14 +230,16 @@ const EventCard = memo(function EventCard({ event, onEdit, onView }: EventCardPr
               onPress={() => onEdit(event.id)}
               activeOpacity={0.75}
             >
-              <Text style={[ec.actionText, { color: BLUE }]}>✏️ Modifier</Text>
+              <Ionicons name="create-outline" size={12} color={BLUE}/>
+              <Text style={[ec.actionText, { color: BLUE }]}>Modifier</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[ec.actionBtn, { borderColor: 'rgba(56,189,248,0.3)', backgroundColor: 'rgba(56,189,248,0.08)' }]}
+              style={[ec.actionBtn, { borderColor: 'rgba(26,159,227,0.3)', backgroundColor: 'rgba(26,159,227,0.08)' }]}
               onPress={() => onView(event.id)}
               activeOpacity={0.75}
             >
-              <Text style={[ec.actionText, { color: CYAN }]}>👁 Voir</Text>
+              <Ionicons name="eye-outline" size={12} color={BLUE}/>
+              <Text style={[ec.actionText, { color: BLUE }]}>Voir</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -252,7 +253,7 @@ const ec = StyleSheet.create({
                 shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: 0.25, shadowRadius: 12, elevation: 6 },
   banner    : { height: 100, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  typeIcon  : { fontSize: 48, textAlign: 'center' },
+  typeIcon  : { textAlign: 'center' },
   statusBadge: { position: 'absolute', top: 10, left: 10,
                  paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8 },
   statusText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
@@ -263,12 +264,12 @@ const ec = StyleSheet.create({
   content   : { padding: 14, gap: 6 },
   title     : { fontSize: 17, fontWeight: '800', color: WHITE, letterSpacing: -0.3, marginBottom: 2 },
   metaRow   : { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  metaIcon  : { fontSize: 12 },
   metaText  : { fontSize: 12, color: MUTED, fontWeight: '500', flex: 1 },
   footer    : { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
-  budget    : { fontSize: 15, fontWeight: '900', color: GOLD },
+  budget    : { fontSize: 15, fontWeight: '900', color: WHITE },
   actions   : { flexDirection: 'row', gap: 8 },
-  actionBtn : { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
+  actionBtn : { flexDirection: 'row', alignItems: 'center', gap: 4,
+                paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
   actionText: { fontSize: 11, fontWeight: '700' },
 });
 
@@ -277,12 +278,12 @@ interface EmptyStateProps { onCreate: () => void }
 const EmptyState = memo(function EmptyState({ onCreate }: EmptyStateProps) {
   return (
     <View style={es.wrap}>
-      <Text style={es.emoji}>🗓️</Text>
+      <Ionicons name="calendar-outline" size={64} color={BLUE}/>
       <Text style={es.title}>Aucun événement</Text>
       <Text style={es.sub}>Créez votre premier événement</Text>
       <TouchableOpacity style={es.btn} onPress={onCreate} activeOpacity={0.8}>
         <LinearGradient
-          colors={[BLUE, CYAN]}
+          colors={[BLUE, BLUE]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={StyleSheet.absoluteFill}
@@ -294,7 +295,6 @@ const EmptyState = memo(function EmptyState({ onCreate }: EmptyStateProps) {
 });
 const es = StyleSheet.create({
   wrap  : { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 12 },
-  emoji : { fontSize: 64 },
   title : { fontSize: 22, fontWeight: '900', color: WHITE },
   sub   : { fontSize: 14, color: MUTED, fontWeight: '500' },
   btn   : { marginTop: 12, paddingHorizontal: 28, paddingVertical: 14, borderRadius: 14,
@@ -312,9 +312,9 @@ interface StatsRowProps {
 }
 const StatsRow = memo(function StatsRow({ totalBudget, upcomingCount, totalSlots }: StatsRowProps) {
   const chips = [
-    { icon: '💰', value: formatBudget(totalBudget), label: 'Budget total', color: GOLD },
-    { icon: '📅', value: String(upcomingCount),     label: 'À venir',      color: BLUE },
-    { icon: '👥', value: String(totalSlots),        label: 'Postes',       color: CYAN },
+    { iconName: 'wallet-outline' as const,  value: formatBudget(totalBudget), label: 'Budget total', color: WHITE },
+    { iconName: 'calendar-outline' as const, value: String(upcomingCount),    label: 'À venir',      color: BLUE  },
+    { iconName: 'people-outline' as const,   value: String(totalSlots),       label: 'Postes',       color: BLUE  },
   ];
   return (
     <View style={str.row}>
@@ -324,7 +324,7 @@ const StatsRow = memo(function StatsRow({ totalBudget, upcomingCount, totalSlots
             colors={[`${c.color}14`, `${c.color}05`]}
             style={StyleSheet.absoluteFill}
           />
-          <Text style={str.chipIcon}>{c.icon}</Text>
+          <Ionicons name={c.iconName} size={18} color={c.color} style={{ marginBottom: 2 }}/>
           <Text style={[str.chipValue, { color: c.color }]} numberOfLines={1}>{c.value}</Text>
           <Text style={str.chipLabel}>{c.label}</Text>
         </View>
@@ -337,7 +337,6 @@ const str = StyleSheet.create({
   chip     : { flex: 1, borderRadius: 14, borderWidth: 1, padding: 12, gap: 3,
                alignItems: 'center', overflow: 'hidden',
                backgroundColor: NAVY },
-  chipIcon : { fontSize: 18, marginBottom: 2 },
   chipValue: { fontSize: 12, fontWeight: '900', letterSpacing: -0.3, textAlign: 'center' },
   chipLabel: { fontSize: 9, fontWeight: '600', color: MUTED, textAlign: 'center' },
 });
@@ -421,8 +420,8 @@ export default function EventsScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: EDGE, gap: 8, paddingBottom: 14 }}
-        style={{ marginBottom: 4 }}
+        contentContainerStyle={{ backgroundColor: '#050E1B', flexGrow: 1, paddingHorizontal: EDGE, gap: 8, paddingBottom: 14 }}
+        style={{ backgroundColor: '#050E1B', marginBottom: 4 }}
       >
         {FILTERS.map(f => {
           const active = filter === f;
@@ -468,12 +467,12 @@ export default function EventsScreen() {
         </View>
         <TouchableOpacity style={ds.addBtn} onPress={handleCreate} activeOpacity={0.8}>
           <LinearGradient
-            colors={[BLUE, CYAN]}
+            colors={[BLUE, BLUE]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFill}
           />
-          <Text style={ds.addBtnText}>+</Text>
+          <Ionicons name="add" size={24} color={WHITE}/>
         </TouchableOpacity>
       </View>
 
@@ -492,10 +491,12 @@ export default function EventsScreen() {
           ListHeaderComponent={ListHeader}
           ListEmptyComponent={<EmptyState onCreate={handleCreate}/>}
           contentContainerStyle={{
+            backgroundColor: '#050E1B',
             paddingTop: 14,
             paddingBottom: insets.bottom + 120,
             flexGrow: 1,
           }}
+          style={{ flex: 1, backgroundColor: '#050E1B' }}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -523,7 +524,6 @@ const ds = StyleSheet.create({
                justifyContent: 'center', overflow: 'hidden',
                shadowColor: BLUE, shadowOffset: { width: 0, height: 3 },
                shadowOpacity: 0.4, shadowRadius: 8, elevation: 6 },
-  addBtnText: { color: WHITE, fontSize: 22, fontWeight: '300', lineHeight: 26, marginTop: -1 },
 });
 
 const fc = StyleSheet.create({

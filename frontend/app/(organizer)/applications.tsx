@@ -1,14 +1,12 @@
 /**
- * app/(organizer)/applications.tsx — EVENTURE v3 · Dark Green
- *
- * Palette : #020A06 bg · #00D97E primary · #F5C842 gold
- * Icons   : lucide-react-native
+ * app/(organizer)/applications.tsx — EVENTURE v3 · Liquid Glass
+ * Palette: #050E1B bg · #1A9FE3 blue · white
+ * Icons: Ionicons from @expo/vector-icons
  * Features: search bar · filter tabs · sort · realtime · optimistic update
  *
  * Schema: public.applications (id, event_role_id, staff_id, status,
  *   message, applied_at, reject_reason, reviewed_at)
  * FK: staff_id → staff(id)  |  event_role_id → event_roles(id)
- * Triggers DB: set_reviewed_at · fn_update_slots_filled · fn_notify_application_status
  */
 import React, {
   memo, useCallback, useEffect, useMemo, useRef, useState,
@@ -20,24 +18,17 @@ import {
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons }       from '@expo/vector-icons';
 import { SafeAreaView }   from 'react-native-safe-area-context';
 import { useRouter }      from 'expo-router';
 import { supabase }       from '@/lib/supabase';
 import { getWorkingUid }  from '@/lib/mockUser';
-import {
-  ArrowLeft, X, Check, CheckCircle, XCircle, LogOut,
-  Calendar, Clock, Users, Star,
-  ChevronRight, AlertCircle, AlertTriangle, Info,
-  MessageCircle, FileText, TrendingUp,
-  Search, ArrowUpDown, Zap, Plus,
-} from 'lucide-react-native';
 
-/* ─── Palette — Dark Green ───────────────────────────────────────────────── */
+/* ─── Palette — 2 blues + white only ────────────────────────────────────── */
 const { width: SW, height: SH } = Dimensions.get('window');
-const BG    = '#050E1B';
+const BG   = '#050E1B';
 const BLUE = '#1A9FE3';
-const GOLD  = '#F5C842';
-const EDGE  = 20;
+const EDGE = 20;
 
 const T = {
   white   : '#FFFFFF',
@@ -49,11 +40,11 @@ const T = {
   border  : 'rgba(26,159,227,0.12)',
   borderHi: 'rgba(26,159,227,0.30)',
   navy    : '#0C1A30',
-  amber   : '#F59E0B',
-  red     : '#EF4444',
-  green   : '#10B981',
-  blue    : '#3B82F6',
-  purple  : '#A78BFA',
+  amber   : 'rgba(255,255,255,0.65)',
+  red     : 'rgba(255,255,255,0.45)',
+  green   : '#1A9FE3',
+  blue    : '#1A9FE3',
+  purple  : '#1A9FE3',
 } as const;
 
 /* ─── Types ────────────────────────────────────────────────────────────── */
@@ -84,11 +75,11 @@ interface AppDetail {
 }
 
 /* ─── Status config ────────────────────────────────────────────────────── */
-const SV: Record<AppStatus, {l:string; c:string; bg:string; border:string}> = {
-  pending  : { l:'En attente', c:T.amber,  bg:'rgba(245,158,11,0.10)',  border:'rgba(245,158,11,0.22)'  },
-  accepted : { l:'Accepté',    c:BLUE,    bg:'rgba(26,159,227,0.10)',   border:'rgba(26,159,227,0.22)'   },
-  rejected : { l:'Refusé',     c:T.red,    bg:'rgba(239,68,68,0.10)',   border:'rgba(239,68,68,0.22)'   },
-  cancelled: { l:'Désistement',c:T.muted,  bg:'rgba(255,255,255,0.04)', border:'rgba(255,255,255,0.10)' },
+const SV: Record<AppStatus, { l: string; c: string; bg: string; border: string }> = {
+  pending  : { l: 'En attente',   c: T.amber,  bg: 'rgba(255,255,255,0.07)',  border: 'rgba(255,255,255,0.18)'  },
+  accepted : { l: 'Accepté',      c: BLUE,     bg: 'rgba(26,159,227,0.10)',   border: 'rgba(26,159,227,0.22)'   },
+  rejected : { l: 'Refusé',       c: T.red,    bg: 'rgba(255,255,255,0.05)',  border: 'rgba(255,255,255,0.14)'  },
+  cancelled: { l: 'Désistement',  c: T.muted,  bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.10)'  },
 };
 
 /* ─── Helpers ──────────────────────────────────────────────────────────── */
@@ -102,28 +93,58 @@ const ago = (iso: string) => {
 const fmt = (iso: string) =>
   new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 
-/* ─── Particle Background ─────────────────────────────────────────────── */
-const PCOLS = [BLUE,'rgba(26,159,227,0.4)',GOLD,'rgba(245,200,66,0.32)','rgba(255,255,255,0.16)'];
-const PTS   = Array.from({length:18},(_,i)=>({
-  id:i, x:((Math.sin(i*2.399)+1)/2)*SW, y:((Math.cos(i*1.618)+1)/2)*900,
-  sz:0.8+(i%8)*0.2, col:PCOLS[i%PCOLS.length], op:0.04+(i%6)*0.03,
+/* ─── Particle Background ────────────────────────────────────────────────── */
+const _NUM_P = 28;
+const _PCOLS = [
+  '#1A9FE3', 'rgba(26,159,227,0.55)', '#1A9FE3', 'rgba(26,159,227,0.40)',
+  'rgba(255,255,255,0.28)', 'rgba(255,255,255,0.16)', 'rgba(26,159,227,0.22)',
+];
+const _PARTS = Array.from({ length: _NUM_P }, (_, i) => ({
+  x:   (Math.sin(i * 2.39996) * 0.5 + 0.5) * 100,
+  y:   (Math.cos(i * 1.61803) * 0.5 + 0.5) * 100,
+  sz:  i % 9 === 0 ? 4.5 : i % 5 === 0 ? 3 : i % 3 === 0 ? 2.2 : 1.6,
+  col: _PCOLS[i % _PCOLS.length],
+  dur: 2400 + (i % 7) * 600,
+  del: (i % 9) * 220,
+  glow: i % 7 === 0,
 }));
-
-const ParticleBg = memo(() => (
-  <View style={StyleSheet.absoluteFill} pointerEvents="none">
-    <LinearGradient colors={[BG,'#091628',BG]} style={StyleSheet.absoluteFill}/>
-    <View style={{position:'absolute',top:'6%',left:'12%',width:SW*.7,height:SW*.7,borderRadius:SW*.35,backgroundColor:'rgba(26,159,227,0.025)'}}/>
-    <View style={{position:'absolute',bottom:'8%',right:'-18%',width:SW*.6,height:SW*.6,borderRadius:SW*.3,backgroundColor:'rgba(56,189,248,0.02)'}}/>
-    {PTS.map(p=><View key={p.id} style={{position:'absolute',left:p.x,top:p.y,width:p.sz,height:p.sz,borderRadius:p.sz/2,backgroundColor:p.col,opacity:p.op}}/>)}
-  </View>
-));
+function ParticleBg() {
+  const anims = React.useRef(_PARTS.map(() => new Animated.Value(0))).current;
+  React.useEffect(() => {
+    const loops = anims.map((anim, i) =>
+      Animated.loop(Animated.sequence([
+        Animated.delay(_PARTS[i].del),
+        Animated.timing(anim, { toValue: 1, duration: _PARTS[i].dur / 2, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0, duration: _PARTS[i].dur / 2, useNativeDriver: true }),
+      ]))
+    );
+    loops.forEach(l => l.start());
+    return () => loops.forEach(l => l.stop());
+  }, []);
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <LinearGradient colors={['#050E1B', '#091628', '#05112A', '#050E1B']} locations={[0, 0.3, 0.7, 1]} style={StyleSheet.absoluteFill}/>
+      {_PARTS.map((p, i) => {
+        const opacity = anims[i].interpolate({ inputRange: [0, 1], outputRange: [0.10, p.glow ? 0.80 : 0.52] });
+        const scale   = anims[i].interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.4] });
+        return (
+          <Animated.View key={i} style={{
+            position: 'absolute', left: `${p.x}%` as any, top: `${p.y}%` as any,
+            width: p.sz, height: p.sz, borderRadius: p.sz / 2, backgroundColor: p.col,
+            opacity, transform: [{ scale }],
+          }}/>
+        );
+      })}
+    </View>
+  );
+}
 
 /* ─── Card Shell ──────────────────────────────────────────────────────── */
-const Card = memo(({children,style,glow=BLUE}:{children:React.ReactNode;style?:any;glow?:string}) => (
-  <View style={[{borderRadius:20,overflow:'hidden',padding:18,gap:14,backgroundColor:T.navy},style]}>
-    <LinearGradient colors={[`${glow}0B`,`${glow}03`]} style={StyleSheet.absoluteFillObject}/>
+const Card = memo(({ children, style, glow = BLUE }: { children: React.ReactNode; style?: any; glow?: string }) => (
+  <View style={[{ borderRadius: 20, overflow: 'hidden', padding: 18, gap: 14, backgroundColor: T.navy }, style]}>
+    <LinearGradient colors={[`${glow}0B`, `${glow}03`]} style={StyleSheet.absoluteFillObject}/>
     {children}
-    <View pointerEvents="none" style={{position:'absolute',top:0,left:0,right:0,bottom:0,borderRadius:20,borderWidth:StyleSheet.hairlineWidth,borderColor:T.border}}/>
+    <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, borderColor: T.border }}/>
   </View>
 ));
 
@@ -168,20 +189,20 @@ const LiveDot = memo(() => {
 /* ─── AlertBar ────────────────────────────────────────────────────────── */
 const AlertBar = memo(({ alerts }: { alerts: { id: string; type: string; msg: string }[] }) => {
   if (!alerts.length) return null;
-  const cfg: { [k: string]: { c: string; Icon: any } } = {
-    warning: { c: T.amber, Icon: AlertTriangle },
-    info   : { c: T.blue,  Icon: Info           },
-    success: { c: BLUE,   Icon: CheckCircle     },
+  const cfg: { [k: string]: { c: string; icon: React.ComponentProps<typeof Ionicons>['name'] } } = {
+    warning: { c: T.amber,  icon: 'warning-outline'           },
+    info   : { c: BLUE,     icon: 'information-circle-outline' },
+    success: { c: BLUE,     icon: 'checkmark-circle-outline'   },
   };
   return (
     <View style={{ gap: 8 }}>
       {alerts.slice(0, 3).map(a => {
-        const { c, Icon } = cfg[a.type] ?? cfg.info;
+        const { c, icon } = cfg[a.type] ?? cfg.info;
         return (
           <View key={a.id} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10,
             padding: 12, borderRadius: 14, backgroundColor: `${c}0E`,
             borderWidth: StyleSheet.hairlineWidth, borderColor: `${c}28` }}>
-            <Icon size={14} color={c} strokeWidth={2} style={{ marginTop: 1 }} />
+            <Ionicons name={icon} size={14} color={c} style={{ marginTop: 1 }} />
             <Text style={{ color: T.white, fontSize: 12, flex: 1, lineHeight: 17 }}>{a.msg}</Text>
           </View>
         );
@@ -285,7 +306,7 @@ const ActionModal = memo(function ActionModal({ app, onClose, onConfirm }: {
   return (
     <Modal transparent visible animationType="none" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <Animated.View style={{ flex: 1, backgroundColor: 'rgba(2,10,6,0.82)', opacity: bgOp }}>
+        <Animated.View style={{ flex: 1, backgroundColor: 'rgba(5,14,27,0.82)', opacity: bgOp }}>
           <TouchableOpacity style={{ flex: 1 }} activeOpacity={1}
             onPress={() => { Keyboard.dismiss(); onClose(); }} />
         </Animated.View>
@@ -295,10 +316,7 @@ const ActionModal = memo(function ActionModal({ app, onClose, onConfirm }: {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 20 }}>
             <View style={{ width: 46, height: 46, borderRadius: 14, backgroundColor: `${color}12`,
               alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: `${color}25` }}>
-              {isCancel
-                ? <LogOut size={20} color={color} strokeWidth={2} />
-                : <XCircle size={20} color={color} strokeWidth={2} />
-              }
+              <Ionicons name={isCancel ? 'exit-outline' : 'close-circle-outline'} size={20} color={color} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ color: T.white, fontSize: 16, fontWeight: '900' }}>
@@ -308,8 +326,8 @@ const ActionModal = memo(function ActionModal({ app, onClose, onConfirm }: {
                 {app.staff_name} · {app.role}
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top:14, right:14, bottom:14, left:14 }}>
-              <X size={20} color={T.muted} strokeWidth={2} />
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 14, right: 14, bottom: 14, left: 14 }}>
+              <Ionicons name="close" size={20} color={T.muted} />
             </TouchableOpacity>
           </View>
           <Text style={{ color: T.muted, fontSize: 12, fontWeight: '600', marginBottom: 10 }}>
@@ -334,10 +352,7 @@ const ActionModal = memo(function ActionModal({ app, onClose, onConfirm }: {
             <TouchableOpacity
               style={[am.confirmBtn, { backgroundColor: `${color}12`, borderColor: `${color}30` }]}
               onPress={() => onConfirm(reason)} activeOpacity={0.82}>
-              {isCancel
-                ? <LogOut size={14} color={color} strokeWidth={2} />
-                : <XCircle size={14} color={color} strokeWidth={2} />
-              }
+              <Ionicons name={isCancel ? 'exit-outline' : 'close-circle-outline'} size={14} color={color} />
               <Text style={{ color, fontWeight: '900', fontSize: 14 }}>
                 {isCancel ? 'Annuler la sélection' : 'Refuser'}
               </Text>
@@ -365,11 +380,10 @@ const am = StyleSheet.create({
 });
 
 /* ─── Application Card ─────────────────────────────────────────────────── */
-const AppCard = memo(function AppCard({ app, index, onAccept, onReject, onChat, onEvent, searchQuery }: {
+const AppCard = memo(function AppCard({ app, index, onAccept, onReject, onChat, onEvent }: {
   app: AppDetail; index: number;
   onAccept: () => void; onReject: () => void;
   onChat: () => void; onEvent: () => void;
-  searchQuery?: string;
 }) {
   const [imgErr, setImgErr] = useState(false);
   const enter = useRef(new Animated.Value(0)).current;
@@ -389,7 +403,7 @@ const AppCard = memo(function AppCard({ app, index, onAccept, onReject, onChat, 
   const stars  = Math.round(app.staff_rating);
   const init   = app.staff_name.trim().split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   const pct    = app.slots > 0 ? app.slots_filled / app.slots : 0;
-  const fillC  = pct >= 0.8 ? T.green : pct >= 0.4 ? T.amber : T.red;
+  const fillC  = pct >= 0.8 ? BLUE : pct >= 0.4 ? T.amber : T.red;
   const isNew  = (Date.now() - new Date(app.applied_at).getTime()) < 86400000 && app.status === 'pending';
 
   return (
@@ -409,12 +423,12 @@ const AppCard = memo(function AppCard({ app, index, onAccept, onReject, onChat, 
         {/* ── EVENT HEADER ── */}
         <TouchableOpacity style={ac.eventRow} onPress={onEvent} activeOpacity={0.80}>
           <View style={[ac.eventIcon, { backgroundColor: `${sv.c}14`, borderColor: `${sv.c}25` }]}>
-            <Calendar size={12} color={sv.c} strokeWidth={2} />
+            <Ionicons name="calendar-outline" size={12} color={sv.c} />
           </View>
           <Text style={ac.eventTxt} numberOfLines={1}>{app.event_title}</Text>
           <Text style={{ color: T.muted, fontSize: 10 }}>{fmt(app.date_start)}</Text>
           {isNew && <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: T.red, marginLeft: 2 }} />}
-          <ChevronRight size={11} color={T.faint} strokeWidth={2} />
+          <Ionicons name="chevron-forward" size={11} color={T.faint} />
         </TouchableOpacity>
 
         {/* ── STAFF ROW ── */}
@@ -437,11 +451,11 @@ const AppCard = memo(function AppCard({ app, index, onAccept, onReject, onChat, 
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
               <View style={{ flexDirection: 'row', gap: 1.5 }}>
                 {[1, 2, 3, 4, 5].map(i => (
-                  <Star key={i} size={10} color={GOLD}
-                    fill={i <= stars ? GOLD : 'transparent'} strokeWidth={1.5} />
+                  <Ionicons key={i} name={i <= stars ? 'star' : 'star-outline'} size={10}
+                    color={i <= stars ? BLUE : T.faint} />
                 ))}
               </View>
-              <Text style={{ color: GOLD, fontSize: 11, fontWeight: '800' }}>{app.staff_rating.toFixed(1)}</Text>
+              <Text style={{ color: T.white, fontSize: 11, fontWeight: '800' }}>{app.staff_rating.toFixed(1)}</Text>
               <Text style={{ color: T.faint, fontSize: 10 }}>·</Text>
               <Text style={{ color: T.muted, fontSize: 10 }}>
                 {app.missions_count} mission{app.missions_count > 1 ? 's' : ''}
@@ -461,7 +475,7 @@ const AppCard = memo(function AppCard({ app, index, onAccept, onReject, onChat, 
             <View style={[ac.rateChip, { backgroundColor: sv.bg, borderColor: sv.border }]}>
               <Text style={{ color: sv.c, fontSize: 9, fontWeight: '800' }}>{sv.l}</Text>
             </View>
-            <Text style={{ color: GOLD, fontSize: 16, fontWeight: '900', letterSpacing: -0.4 }}>
+            <Text style={{ color: T.white, fontSize: 16, fontWeight: '900', letterSpacing: -0.4 }}>
               {app.hourly_rate}<Text style={{ fontSize: 10, color: T.muted }}>€/h</Text>
             </Text>
             <Text style={{ color: T.muted, fontSize: 9 }}>{ago(app.applied_at)}</Text>
@@ -496,16 +510,16 @@ const AppCard = memo(function AppCard({ app, index, onAccept, onReject, onChat, 
         {app.status === 'pending' && (
           <View style={ac.actions}>
             <TouchableOpacity style={ac.msgBtn} onPress={onChat} activeOpacity={0.78}>
-              <MessageCircle size={13} color={T.muted} strokeWidth={2} />
+              <Ionicons name="chatbubble-outline" size={13} color={T.muted} />
               <Text style={{ color: T.muted, fontSize: 11, fontWeight: '600' }}>Message</Text>
             </TouchableOpacity>
             <TouchableOpacity style={ac.rejectBtn} onPress={onReject} activeOpacity={0.78}>
-              <X size={13} color={T.red} strokeWidth={2.5} />
+              <Ionicons name="close" size={14} color={T.red} />
               <Text style={{ color: T.red, fontSize: 11, fontWeight: '700' }}>Refuser</Text>
             </TouchableOpacity>
             <TouchableOpacity style={ac.acceptBtn} onPress={onAccept} activeOpacity={0.85}>
               <LinearGradient colors={['rgba(26,159,227,0.30)', 'rgba(26,159,227,0.14)']} style={ac.acceptGrad}>
-                <Check size={14} color={BLUE} strokeWidth={2.5} />
+                <Ionicons name="checkmark" size={14} color={BLUE} />
                 <Text style={{ color: BLUE, fontSize: 12, fontWeight: '900' }}>Accepter</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -514,13 +528,13 @@ const AppCard = memo(function AppCard({ app, index, onAccept, onReject, onChat, 
         {app.status === 'accepted' && (
           <View style={ac.actions}>
             <TouchableOpacity style={ac.msgBtn} onPress={onChat} activeOpacity={0.78}>
-              <MessageCircle size={13} color={T.muted} strokeWidth={2} />
+              <Ionicons name="chatbubble-outline" size={13} color={T.muted} />
               <Text style={{ color: T.muted, fontSize: 11, fontWeight: '600' }}>Contacter</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[ac.rejectBtn, { flex: 1, borderColor: 'rgba(245,158,11,0.25)', backgroundColor: 'rgba(245,158,11,0.07)' }]}
+              style={[ac.rejectBtn, { flex: 1, borderColor: 'rgba(255,255,255,0.20)', backgroundColor: 'rgba(255,255,255,0.05)' }]}
               onPress={onReject} activeOpacity={0.78}>
-              <LogOut size={13} color={T.amber} strokeWidth={2} />
+              <Ionicons name="exit-outline" size={13} color={T.amber} />
               <Text style={{ color: T.amber, fontSize: 11, fontWeight: '700' }}>Annuler la sélection</Text>
             </TouchableOpacity>
           </View>
@@ -528,8 +542,8 @@ const AppCard = memo(function AppCard({ app, index, onAccept, onReject, onChat, 
         {(app.status === 'rejected' || app.status === 'cancelled') && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 2 }}>
             {app.status === 'rejected'
-              ? <XCircle size={12} color={sv.c} strokeWidth={2} />
-              : <LogOut size={12} color={sv.c} strokeWidth={2} />
+              ? <Ionicons name="close-circle-outline" size={12} color={sv.c} />
+              : <Ionicons name="exit-outline" size={12} color={sv.c} />
             }
             <Text style={{ color: sv.c, fontSize: 11, opacity: 0.75 }}>
               {app.status === 'rejected' ? 'Candidature refusée' : 'Candidat désisté'}
@@ -561,8 +575,8 @@ const ac = StyleSheet.create({
     paddingVertical: 9, borderRadius: 12, backgroundColor: T.surf,
     borderWidth: StyleSheet.hairlineWidth, borderColor: T.border },
   rejectBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12,
-    paddingVertical: 9, borderRadius: 12, backgroundColor: 'rgba(239,68,68,0.07)',
-    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(239,68,68,0.20)' },
+    paddingVertical: 9, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.14)' },
   acceptBtn : { flex: 1, borderRadius: 12, overflow: 'hidden' },
   acceptGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9 },
 });
@@ -708,8 +722,8 @@ export default function ApplicationsScreen() {
       );
     }
     switch (sortBy) {
-      case 'rating': a.sort((x, y) => y.staff_rating  - x.staff_rating);  break;
-      case 'rate'  : a.sort((x, y) => y.hourly_rate   - x.hourly_rate);   break;
+      case 'rating': a.sort((x, y) => y.staff_rating - x.staff_rating); break;
+      case 'rate'  : a.sort((x, y) => y.hourly_rate  - x.hourly_rate);  break;
     }
     return a;
   }, [apps, tab, filterEvt, search, sortBy]);
@@ -743,12 +757,12 @@ export default function ApplicationsScreen() {
   }, [pendingCount, acceptRate, apps.length]);
 
   const renderItem   = useCallback(({ item, index }: { item: AppDetail; index: number }) => (
-    <AppCard app={item} index={index} searchQuery={search}
+    <AppCard app={item} index={index}
       onAccept={() => handleAccept(item)} onReject={() => handleReject(item)}
       onChat={() => router.push({ pathname: '/(shared)/chat/[id]', params: { id: item.staff_id, name: item.staff_name } } as any)}
       onEvent={() => router.push({ pathname: '/(organizer)/event/[id]', params: { id: item.event_id } } as any)}
     />
-  ), [handleAccept, handleReject, router, search]);
+  ), [handleAccept, handleReject, router]);
 
   const keyExtractor = useCallback((a: AppDetail) => `app_${a.id}`, []);
 
@@ -765,7 +779,7 @@ export default function ApplicationsScreen() {
           <TouchableOpacity
             style={[ds.navBtn, { backgroundColor: T.surf, borderColor: T.border }]}
             onPress={() => router.back()} activeOpacity={0.78}>
-            <ArrowLeft size={18} color={T.muted} strokeWidth={2} />
+            <Ionicons name="arrow-back" size={18} color={T.muted} />
           </TouchableOpacity>
           <View style={{ flex: 1, paddingHorizontal: 12, gap: 1 }}>
             <Text style={[ds.navLabel, { color: T.muted }]}>Gestion</Text>
@@ -777,7 +791,7 @@ export default function ApplicationsScreen() {
           <TouchableOpacity
             style={[ds.navBtn, { backgroundColor: T.surf, borderColor: T.border }]}
             onPress={() => router.push('/(organizer)/create-event' as any)} activeOpacity={0.78}>
-            <Plus size={18} color={BLUE} strokeWidth={2} />
+            <Ionicons name="add" size={18} color={BLUE} />
           </TouchableOpacity>
         </View>
 
@@ -785,7 +799,7 @@ export default function ApplicationsScreen() {
         <View style={{ paddingHorizontal: EDGE, paddingBottom: 10 }}>
           <View style={[ds.searchWrap,
             { backgroundColor: T.surf, borderColor: searchFocus ? T.borderHi : T.border }]}>
-            <Search size={15} color={searchFocus ? BLUE : T.muted} strokeWidth={2} />
+            <Ionicons name="search-outline" size={15} color={searchFocus ? BLUE : T.muted} />
             <TextInput
               style={[ds.searchInput, { color: T.white }]}
               value={search}
@@ -799,7 +813,7 @@ export default function ApplicationsScreen() {
             />
             {search.length > 0 && (
               <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}>
-                <X size={14} color={T.muted} strokeWidth={2} />
+                <Ionicons name="close" size={14} color={T.muted} />
               </TouchableOpacity>
             )}
           </View>
@@ -807,7 +821,8 @@ export default function ApplicationsScreen() {
 
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 130 }}
+          style={{ flex: 1, backgroundColor: '#050E1B' }}
+          contentContainerStyle={{ backgroundColor: '#050E1B', flexGrow: 1, paddingBottom: 130 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -832,14 +847,14 @@ export default function ApplicationsScreen() {
               {/* ── KPI STRIP ── */}
               <View style={ds.kpiRow}>
                 {[
-                  { l: 'En attente', v: pendingCount,  c: T.amber,  Icon: Clock       },
-                  { l: 'Acceptées',  v: acceptedCount, c: BLUE,    Icon: CheckCircle },
-                  { l: 'Taux',       v: acceptRate,    c: BLUE,    Icon: TrendingUp, suffix: '%' },
-                  { l: 'Total',      v: apps.length,   c: GOLD,     Icon: FileText    },
-                ].map(({ l, v, c, Icon, suffix }) => (
+                  { l: 'En attente', v: pendingCount,  c: T.amber,  icon: 'time-outline' as const       },
+                  { l: 'Acceptées',  v: acceptedCount, c: BLUE,     icon: 'checkmark-circle-outline' as const },
+                  { l: 'Taux',       v: acceptRate,    c: BLUE,     icon: 'trending-up-outline' as const, suffix: '%' },
+                  { l: 'Total',      v: apps.length,   c: T.white,  icon: 'document-text-outline' as const },
+                ].map(({ l, v, c, icon, suffix }) => (
                   <View key={l} style={[ds.kpiCard, { backgroundColor: T.navy, borderColor: `${c}20` }]}>
                     <LinearGradient colors={[`${c}12`, `${c}04`]} style={StyleSheet.absoluteFillObject} />
-                    <Icon size={14} color={c} strokeWidth={2} />
+                    <Ionicons name={icon} size={14} color={c} />
                     <Counter value={v} suffix={suffix ?? ''} color={c} size={18} />
                     <Text style={{ color: T.muted, fontSize: 9, fontWeight: '700', textAlign: 'center', lineHeight: 12 }}>{l}</Text>
                     <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
@@ -857,9 +872,9 @@ export default function ApplicationsScreen() {
                       <Counter value={acceptRate} suffix="%" color={BLUE} size={22} />
                     </View>
                     <View style={{ gap: 10 }}>
-                      <FunnelRow label="Reçues"     value={apps.length}    total={apps.length} color={T.blue}  />
-                      <FunnelRow label="En attente" value={pendingCount}   total={apps.length} color={T.amber} />
-                      <FunnelRow label="Acceptées"  value={acceptedCount}  total={apps.length} color={BLUE}   />
+                      <FunnelRow label="Reçues"     value={apps.length}   total={apps.length} color={BLUE}   />
+                      <FunnelRow label="En attente" value={pendingCount}  total={apps.length} color={T.amber} />
+                      <FunnelRow label="Acceptées"  value={acceptedCount} total={apps.length} color={BLUE}   />
                     </View>
                   </Card>
                 </View>
@@ -868,7 +883,7 @@ export default function ApplicationsScreen() {
               {/* ── STATUS TABS + SORT ── */}
               <View style={{ flexDirection: 'row', alignItems: 'center', paddingRight: EDGE }}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ paddingHorizontal: EDGE, paddingBottom: 10, gap: 8 }}>
+                  contentContainerStyle={{ backgroundColor: '#050E1B', flexGrow: 1, paddingHorizontal: EDGE, paddingBottom: 10, gap: 8 }} style={{ backgroundColor: '#050E1B' }}>
                   {TABS.map(([k, l, n]) => (
                     <TouchableOpacity key={k}
                       style={[ds.chip,
@@ -884,7 +899,7 @@ export default function ApplicationsScreen() {
                 <TouchableOpacity onPress={cycleSortBy}
                   style={[ds.chip, { marginBottom: 10, gap: 4, paddingHorizontal: 10,
                     backgroundColor: T.surf, borderColor: T.border }]} activeOpacity={0.78}>
-                  <ArrowUpDown size={11} color={T.muted} strokeWidth={2} />
+                  <Ionicons name="swap-vertical-outline" size={11} color={T.muted} />
                   <Text style={[ds.chipTxt, { fontSize: 11, color: T.offWhite }]}>{sortLabels[sortBy]}</Text>
                 </TouchableOpacity>
               </View>
@@ -892,14 +907,14 @@ export default function ApplicationsScreen() {
               {/* ── EVENT FILTER ── */}
               {events.length > 1 && (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ paddingHorizontal: EDGE, paddingBottom: 10, gap: 8 }}>
+                  contentContainerStyle={{ backgroundColor: '#050E1B', flexGrow: 1, paddingHorizontal: EDGE, paddingBottom: 10, gap: 8 }} style={{ backgroundColor: '#050E1B' }}>
                   {[{ id: null as string | null, title: 'Tous' }, ...events].map(e => (
                     <TouchableOpacity key={String(e.id)}
                       style={[ds.chip,
                         { backgroundColor: T.surf, borderColor: T.border },
                         filterEvt === e.id && { backgroundColor: 'rgba(26,159,227,0.12)', borderColor: T.borderHi }]}
                       onPress={() => setFilterEvt(e.id)} activeOpacity={0.75}>
-                      {e.id && <Calendar size={10} color={filterEvt === e.id ? BLUE : T.muted} strokeWidth={2} />}
+                      {e.id && <Ionicons name="calendar-outline" size={10} color={filterEvt === e.id ? BLUE : T.muted} />}
                       <Text style={[ds.chipTxt, { color: T.offWhite },
                         filterEvt === e.id && { color: BLUE, fontWeight: '800' }]} numberOfLines={1}>
                         {e.title}
@@ -917,10 +932,10 @@ export default function ApplicationsScreen() {
                       backgroundColor: 'rgba(26,159,227,0.10)',
                       alignItems: 'center', justifyContent: 'center',
                       borderWidth: 1, borderColor: T.borderHi }}>
-                      {tab === 'pending'
-                        ? <Clock size={38} color="rgba(26,159,227,0.45)" strokeWidth={1.5} />
-                        : <FileText size={38} color="rgba(26,159,227,0.45)" strokeWidth={1.5} />
-                      }
+                      <Ionicons
+                        name={tab === 'pending' ? 'time-outline' : 'document-text-outline'}
+                        size={38} color="rgba(26,159,227,0.45)"
+                      />
                     </View>
                     <Text style={{ color: T.white, fontSize: 17, fontWeight: '900', letterSpacing: -0.3 }}>
                       {search ? 'Aucun résultat'

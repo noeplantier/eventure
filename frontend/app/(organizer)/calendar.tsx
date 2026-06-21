@@ -9,17 +9,19 @@ import {
   StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { LinearGradient }  from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { Ionicons }        from '@expo/vector-icons';
 import { SafeAreaView }    from 'react-native-safe-area-context';
 import { useRouter }       from 'expo-router';
 import { supabase }        from '@/lib/supabase';
 import { getWorkingUid }   from '@/lib/mockUser';
+import { useInteractiveBg } from '@/components/InteractiveBg';
 
 /* ─── Palette — Dark Green ───────────────────────────────────────────────── */
 const { width: SW } = Dimensions.get('window');
 const BG    = '#050E1B';
 const BLUE = '#1A9FE3';
-const GOLD  = '#F5C842';
+const GOLD  = '#FFFFFF';
 const EDGE  = 16;
 
 const T = {
@@ -32,21 +34,21 @@ const T = {
   border  : 'rgba(26,159,227,0.12)',
   borderHi: 'rgba(26,159,227,0.30)',
   navy    : '#0C1A30',
-  amber   : '#F59E0B',
-  red     : '#EF4444',
-  green   : '#10B981',
-  blue    : '#3B82F6',
-  purple  : '#A78BFA',
+  amber   : 'rgba(255,255,255,0.65)',
+  red     : 'rgba(255,255,255,0.45)',
+  green   : '#1A9FE3',
+  blue    : '#1A9FE3',
+  purple  : '#1A9FE3',
 } as const;
 
-const SUCCESS = '#10B981';
-const WARNING = '#F59E0B';
-const DANGER  = '#EF4444';
-const PURPLE  = '#A78BFA';
+const SUCCESS = '#1A9FE3';
+const WARNING = 'rgba(255,255,255,0.65)';
+const DANGER  = 'rgba(255,255,255,0.45)';
+const PURPLE  = '#1A9FE3';
 
 const TYPE_COLORS: Record<string, string> = {
   Festival: SUCCESS, Gala: WARNING, Conférence: BLUE,
-  Mariage: '#EC4899', Séminaire: PURPLE, Concert: DANGER, Sport: SUCCESS,
+  Mariage: '#1A9FE3', Séminaire: PURPLE, Concert: DANGER, Sport: SUCCESS,
 };
 const typeColor = (t: string | null) => TYPE_COLORS[t ?? ''] ?? BLUE;
 
@@ -55,21 +57,6 @@ const DAYS   = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 const isSameDay = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
-/* ─── Particle Background ─────────────────────────────────────────────── */
-const PCOLS = [BLUE,'rgba(26,159,227,0.4)',GOLD,'rgba(245,200,66,0.32)','rgba(255,255,255,0.16)'];
-const PTS   = Array.from({length:18},(_,i)=>({
-  id:i, x:((Math.sin(i*2.399)+1)/2)*SW, y:((Math.cos(i*1.618)+1)/2)*900,
-  sz:0.8+(i%8)*0.2, col:PCOLS[i%PCOLS.length], op:0.04+(i%6)*0.03,
-}));
-
-const ParticleBg = memo(() => (
-  <View style={StyleSheet.absoluteFill} pointerEvents="none">
-    <LinearGradient colors={[BG,'#091628',BG]} style={StyleSheet.absoluteFill}/>
-    <View style={{position:'absolute',top:'6%',left:'12%',width:SW*.7,height:SW*.7,borderRadius:SW*.35,backgroundColor:'rgba(26,159,227,0.025)'}}/>
-    <View style={{position:'absolute',bottom:'8%',right:'-18%',width:SW*.6,height:SW*.6,borderRadius:SW*.3,backgroundColor:'rgba(56,189,248,0.02)'}}/>
-    {PTS.map(p=><View key={p.id} style={{position:'absolute',left:p.x,top:p.y,width:p.sz,height:p.sz,borderRadius:p.sz/2,backgroundColor:p.col,opacity:p.op}}/>)}
-  </View>
-));
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 interface CalEvent {
@@ -213,7 +200,7 @@ const DayModal = memo(function DayModal({ visible, date, events, onClose, onCrea
 });
 const dm = StyleSheet.create({
   sheet      : { borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden',
-    padding: 20, paddingTop: 12, backgroundColor: T.navy },
+    padding: 20, paddingTop: 12, backgroundColor: '#0C1A30' },
   handle     : { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   dateTitle  : { fontSize: 17, fontWeight: '800', textTransform: 'capitalize' },
   sectionLabel:{ fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
@@ -222,7 +209,7 @@ const dm = StyleSheet.create({
   evtMeta    : { fontSize: 12 },
   evtType    : { fontSize: 11, fontWeight: '600' },
   createBtn  : { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    borderRadius: 14, paddingVertical: 14, marginTop: 16, overflow: 'hidden', backgroundColor: T.navy },
+    borderRadius: 14, paddingVertical: 14, marginTop: 16, overflow: 'hidden', backgroundColor: '#0C1A30' },
   createTxt  : { color: BLUE, fontWeight: '800', fontSize: 15 },
 });
 
@@ -231,7 +218,7 @@ const MonthLegend = memo(({ events }: { events: CalEvent[] }) => {
   const types = [...new Set(events.map(e => e.type).filter(Boolean))] as string[];
   if (!types.length) return null;
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 2 }}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{backgroundColor:'#050E1B',flexGrow:1, gap: 8, paddingBottom: 2 }} style={{backgroundColor:'#050E1B'}}>
       {types.map(t => (
         <View key={t} style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
           paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20,
@@ -245,6 +232,53 @@ const MonthLegend = memo(({ events }: { events: CalEvent[] }) => {
 });
 
 /* ─── SCREEN ─────────────────────────────────────────────────────────────── */
+/* ─── Enhanced particles ─── */
+const _NUM_P = 32;
+const _PCOLS = [
+  '#1A9FE3','rgba(26,159,227,0.55)','#1A9FE3','rgba(26,159,227,0.40)',
+  'rgba(255,255,255,0.28)','rgba(255,255,255,0.16)','rgba(26,159,227,0.22)',
+];
+const _PARTS = Array.from({ length: _NUM_P }, (_, i) => ({
+  x:   (Math.sin(i * 2.39996) * 0.5 + 0.5) * 100,
+  y:   (Math.cos(i * 1.61803) * 0.5 + 0.5) * 100,
+  sz:  i % 9 === 0 ? 4.5 : i % 5 === 0 ? 3 : i % 3 === 0 ? 2.2 : 1.6,
+  col: _PCOLS[i % _PCOLS.length],
+  dur: 2400 + (i % 7) * 600,
+  del: (i % 9) * 220,
+  glow: i % 7 === 0,
+}));
+function ParticleBg() {
+  const anims = React.useRef(_PARTS.map(() => new Animated.Value(0))).current;
+  React.useEffect(() => {
+    const loops = anims.map((anim, i) =>
+      Animated.loop(Animated.sequence([
+        Animated.delay(_PARTS[i].del),
+        Animated.timing(anim, { toValue: 1, duration: _PARTS[i].dur / 2, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0, duration: _PARTS[i].dur / 2, useNativeDriver: true }),
+      ]))
+    );
+    loops.forEach(l => l.start());
+    return () => loops.forEach(l => l.stop());
+  }, []);
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <LinearGradient colors={['#050E1B','#091628','#05112A','#050E1B']} locations={[0,0.3,0.7,1]} style={StyleSheet.absoluteFill}/>
+      <View style={{position:'absolute',top:'6%',left:'-25%',right:'-25%',height:'50%',backgroundColor:'rgba(26,159,227,0.035)',borderRadius:999}}/>
+      {_PARTS.map((p, i) => {
+        const opacity = anims[i].interpolate({ inputRange:[0,1], outputRange:[0.10, p.glow ? 0.80 : 0.52] });
+        const scale   = anims[i].interpolate({ inputRange:[0,1], outputRange:[0.6, 1.4] });
+        return (
+          <Animated.View key={i} style={{
+            position:'absolute', left:`${p.x}%` as any, top:`${p.y}%` as any,
+            width:p.sz, height:p.sz, borderRadius:p.sz/2, backgroundColor:p.col,
+            opacity, transform:[{scale}],
+          }}/>
+        );
+      })}
+    </View>
+  );
+}
+
 export default function CalendarScreen() {
   const router = useRouter();
 
@@ -318,7 +352,7 @@ export default function CalendarScreen() {
             <TouchableOpacity
               style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
                 paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, overflow: 'hidden',
-                backgroundColor: T.navy, borderWidth: 1, borderColor: T.borderHi }}
+                backgroundColor: '#0C1A30', borderWidth: 1, borderColor: T.borderHi }}
               onPress={() => router.push('/(organizer)/create-event' as any)}
               activeOpacity={0.82}
             >
@@ -361,10 +395,10 @@ export default function CalendarScreen() {
           </View>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: EDGE, paddingBottom: 120, gap: 16 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{backgroundColor:'#050E1B',flexGrow:1, paddingHorizontal: EDGE, paddingBottom: 120, gap: 16 }} style={{backgroundColor:'#050E1B'}}>
 
           {/* ── CALENDAR GRID ── */}
-          <View style={[cal.grid, { backgroundColor: T.navy, borderColor: T.border }]}>
+          <View style={[cal.grid, { backgroundColor: '#0C1A30', borderColor: T.border }]}>
             <LinearGradient colors={[`${BLUE}08`,`${BLUE}02`]} style={StyleSheet.absoluteFillObject}/>
             <View style={{ flexDirection: 'row', marginBottom: 4 }}>
               {DAYS.map((d, i) => (
@@ -407,7 +441,7 @@ export default function CalendarScreen() {
                 return (
                   <TouchableOpacity
                     key={ev.id}
-                    style={[cal.evtCard, { backgroundColor: T.navy, borderColor: T.border, borderLeftColor: tc }]}
+                    style={[cal.evtCard, { backgroundColor: '#0C1A30', borderColor: T.border, borderLeftColor: tc }]}
                     onPress={() => router.push({ pathname: '/(organizer)/event/[id]', params: { id: ev.id } } as any)}
                     activeOpacity={0.82}
                   >
@@ -423,7 +457,7 @@ export default function CalendarScreen() {
                     <View style={{ alignItems: 'flex-end', gap: 6 }}>
                       {!isPast && (
                         <View style={{ paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6,
-                          backgroundColor: days <= 3 ? 'rgba(239,68,68,0.10)' : days <= 7 ? 'rgba(245,158,11,0.10)' : 'rgba(26,159,227,0.10)',
+                          backgroundColor: days <= 3 ? 'rgba(255,255,255,0.05)' : days <= 7 ? 'rgba(255,255,255,0.07)' : 'rgba(26,159,227,0.10)',
                           borderWidth: StyleSheet.hairlineWidth,
                           borderColor: days <= 3 ? 'rgba(239,68,68,0.25)' : days <= 7 ? 'rgba(245,158,11,0.25)' : T.border }}>
                           <Text style={{ fontSize: 10, fontWeight: '700',

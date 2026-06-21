@@ -18,15 +18,13 @@ import { getWorkingUid }   from '@/lib/mockUser';
 const { width: SW } = Dimensions.get('window');
 const BG    = '#050E1B';
 const BLUE  = '#1A9FE3';
-const CYAN  = '#38BDF8';
-const GOLD  = '#F5C842';
 const NAVY  = '#0C1A30';
 const WHITE = '#FFFFFF';
 const MUTED = 'rgba(255,255,255,0.55)';
 const FAINT = 'rgba(255,255,255,0.08)';
 
-const SUCCESS = '#10B981';
-const WARNING = '#F59E0B';
+const SUCCESS = '#1A9FE3';
+const WARNING = 'rgba(255,255,255,0.65)';
 const EDGE    = 16;
 
 const T = {
@@ -39,14 +37,14 @@ const T = {
   border  : 'rgba(26,159,227,0.12)',
   borderHi: 'rgba(26,159,227,0.30)',
   navy    : NAVY,
-  amber   : '#F59E0B',
-  red     : '#EF4444',
-  blue    : '#60A5FA',
-  purple  : '#A78BFA',
+  amber   : 'rgba(255,255,255,0.65)',
+  red     : 'rgba(255,255,255,0.45)',
+  blue    : '#1A9FE3',
+  purple  : '#1A9FE3',
 } as const;
 
 /* ─── Particle background ────────────────────────────────────────────────── */
-const PCOLS = [BLUE, 'rgba(26,159,227,0.4)', GOLD, 'rgba(245,200,66,0.32)', 'rgba(255,255,255,0.16)'];
+const PCOLS = [BLUE, 'rgba(26,159,227,0.4)', '#1A9FE3', 'rgba(26,159,227,0.32)', 'rgba(255,255,255,0.16)'];
 const PTS   = Array.from({ length: 18 }, (_, i) => ({
   id: i, x: ((Math.sin(i * 2.399) + 1) / 2) * SW, y: ((Math.cos(i * 1.618) + 1) / 2) * 900,
   sz: 0.8 + (i % 8) * 0.2, col: PCOLS[i % PCOLS.length], op: 0.04 + (i % 6) * 0.03,
@@ -98,11 +96,16 @@ function Avatar({ name, size = 44, bg = BLUE }: { name: string; size?: number; b
 }
 
 /* ─── StarRating component (display only) ────────────────────────────────── */
-function StarRating({ rating, size = 14 }: { rating: number; size?: number }) {
+function StarRating({ rating, size = 16 }: { rating: number; size?: number }) {
   return (
     <View style={{ flexDirection: 'row', gap: 2, alignItems: 'center' }}>
       {[1, 2, 3, 4, 5].map(i => (
-        <Text key={i} style={{ fontSize: size, color: i <= Math.round(rating) ? GOLD : 'rgba(255,255,255,0.2)' }}>★</Text>
+        <Ionicons
+          key={i}
+          name={i <= Math.round(rating) ? 'star' : 'star-outline'}
+          size={size}
+          color={i <= Math.round(rating) ? '#1A9FE3' : 'rgba(255,255,255,0.25)'}
+        />
       ))}
       <Text style={{ fontSize: size - 2, color: MUTED, marginLeft: 4 }}>{rating.toFixed(1)}</Text>
     </View>
@@ -151,12 +154,13 @@ const StaffProfileModal = memo(function StaffProfileModal({
 
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 40 }}
+            style={{ flex: 1, backgroundColor: '#050E1B' }}
+            contentContainerStyle={{ flexGrow: 1, backgroundColor: '#050E1B', paddingBottom: 40 }}
             bounces={false}
           >
             {/* Close button */}
             <TouchableOpacity style={ms.closeBtn} onPress={onClose} activeOpacity={0.7}>
-              <Text style={{ color: MUTED, fontSize: 18, fontWeight: '600' }}>✕</Text>
+              <Ionicons name="close" size={18} color={MUTED}/>
             </TouchableOpacity>
 
             {/* Avatar + name */}
@@ -183,9 +187,9 @@ const StaffProfileModal = memo(function StaffProfileModal({
                 <View style={{
                   flexDirection: 'row', alignItems: 'center', gap: 6,
                   paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
-                  backgroundColor: isAvailable ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.06)',
+                  backgroundColor: isAvailable ? 'rgba(26,159,227,0.12)' : 'rgba(255,255,255,0.06)',
                   borderWidth: 1,
-                  borderColor: isAvailable ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.1)',
+                  borderColor: isAvailable ? 'rgba(26,159,227,0.30)' : 'rgba(255,255,255,0.1)',
                 }}>
                   <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: isAvailable ? SUCCESS : MUTED }}/>
                   <Text style={{ fontSize: 12, fontWeight: '600', color: isAvailable ? SUCCESS : MUTED }}>
@@ -258,7 +262,7 @@ const StaffProfileModal = memo(function StaffProfileModal({
                 activeOpacity={0.8}
                 onPress={onClose}
               >
-                <Text style={{ fontSize: 14 }}>✉</Text>
+                <Ionicons name="mail-outline" size={16} color={BLUE}/>
                 <Text style={{ color: BLUE, fontSize: 14, fontWeight: '700' }}>Message</Text>
               </TouchableOpacity>
 
@@ -362,7 +366,7 @@ const StaffCard = memo(function StaffCard({ staff, index, onPress }: {
 
             {/* Role chips */}
             {roles.length > 0 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 5, flexDirection: 'row' }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ backgroundColor: '#050E1B', flexGrow: 1, gap: 5, flexDirection: 'row' }} style={{ backgroundColor: '#050E1B' }}>
                 {roles.slice(0, 3).map((r, i) => (
                   <View key={i} style={[sc.tag, { backgroundColor: 'rgba(26,159,227,0.12)', borderColor: T.borderHi }]}>
                     <Text style={[sc.tagTxt, { color: BLUE }]}>{r}</Text>
@@ -387,7 +391,7 @@ const StaffCard = memo(function StaffCard({ staff, index, onPress }: {
               )}
               {staff.hourly_rate != null && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Text style={{ fontSize: 11, color: GOLD, fontWeight: '600' }}>{staff.hourly_rate}€/h</Text>
+                  <Text style={{ fontSize: 11, color: WHITE, fontWeight: '600' }}>{staff.hourly_rate}€/h</Text>
                 </View>
               )}
             </View>
@@ -753,7 +757,8 @@ export default function StaffScreen() {
         {/* ── LIST ── */}
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: EDGE, paddingBottom: 120, paddingTop: 4 }}
+          style={{ flex: 1, backgroundColor: '#050E1B' }}
+          contentContainerStyle={{ backgroundColor: '#050E1B', flexGrow: 1, paddingHorizontal: EDGE, paddingBottom: 120, paddingTop: 4 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

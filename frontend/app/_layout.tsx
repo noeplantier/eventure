@@ -58,7 +58,7 @@ const PARTICLES = Array.from({ length: 80 }, (_, i) => ({
   r:    i % 7 === 0 ? 1.8 : i % 3 === 0 ? 1.1 : 0.6,
   op:   0.10 + (i % 8) * 0.05,
   // Vert pour les grandes, or pour les moyennes, blanc pour les petites
-  col:  i % 7 === 0 ? '#00D97E' : i % 3 === 0 ? '#F5C842' : 'rgba(255,255,255,0.70)',
+  col:  i % 7 === 0 ? '#1A9FE3' : i % 3 === 0 ? '#F5C842' : 'rgba(255,255,255,0.70)',
 }));
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -91,7 +91,7 @@ const ScreenshotOverlay = React.memo(function ScreenshotOverlay({
     >
       {/* Fond dégradé Eventure — identique structure Universe mais vert sombre */}
       <LinearGradient
-        colors={['#020A06', '#051A0E', '#0A2218', '#020A06']}
+        colors={['#050E1B', '#091628', '#0C1A30', '#050E1B']}
         locations={[0, 0.35, 0.70, 1]}
         style={StyleSheet.absoluteFill}
       />
@@ -118,7 +118,7 @@ const ScreenshotOverlay = React.memo(function ScreenshotOverlay({
         width:            SW * 1.50,
         height:           SH * 0.45,
         borderRadius:     SW,
-        backgroundColor: 'rgba(0,217,126,0.04)',
+        backgroundColor: 'rgba(26,159,227,0.04)',
       }}/>
 
       {/* Halo or bas droite */}
@@ -129,7 +129,7 @@ const ScreenshotOverlay = React.memo(function ScreenshotOverlay({
         width:            SW * 0.80,
         height:           SW * 0.80,
         borderRadius:     SW * 0.40,
-        backgroundColor: 'rgba(245,200,66,0.03)',
+        backgroundColor: 'rgba(56,189,248,0.03)',
       }}/>
 
       {/* Contenu central — identique structure Universe */}
@@ -171,20 +171,20 @@ const ov = StyleSheet.create({
   },
   iconBox: {
     width: 84, height: 84, borderRadius: 22,
-    backgroundColor: 'rgba(0,217,126,0.08)',
+    backgroundColor: 'rgba(26,159,227,0.08)',
     borderWidth: 1.5, borderColor: 'rgba(0,217,126,0.18)',
     alignItems: 'center', justifyContent: 'center', marginBottom: 4,
   },
   title:   { color: '#fff', fontSize: 26, fontWeight: '900', letterSpacing: 5, textTransform: 'uppercase' },
   eyebrow: { color: 'rgba(0,217,126,0.38)', fontSize: 10, letterSpacing: 1.8, textTransform: 'uppercase', marginTop: -6, textAlign: 'center' },
-  divider: { width: 44, height: 1, backgroundColor: 'rgba(0,217,126,0.14)', borderRadius: 1, marginVertical: 2 },
+  divider: { width: 44, height: 1, backgroundColor: 'rgba(26,159,227,0.14)', borderRadius: 1, marginVertical: 2 },
   msg:     { color: 'rgba(255,255,255,0.72)', fontSize: 15, fontWeight: '700', textAlign: 'center', letterSpacing: -0.2 },
   sub:     { color: 'rgba(255,255,255,0.26)', fontSize: 11, textAlign: 'center', lineHeight: 17, marginTop: -2 },
   badge: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 13, paddingVertical: 6, borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(0,217,126,0.10)',
-    backgroundColor: 'rgba(0,217,126,0.03)', marginTop: 6,
+    backgroundColor: 'rgba(26,159,227,0.03)', marginTop: 6,
   },
   badgeTxt: { color: 'rgba(0,217,126,0.32)', fontSize: 8.5, fontWeight: '800', letterSpacing: 1.8, textTransform: 'uppercase' },
 });
@@ -316,12 +316,12 @@ function ThemedApp() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style={isDark ? 'light' : 'dark'}/>
+      <StatusBar style='light'/>
 
       <Stack
         screenOptions={{
           headerShown:      false,
-          contentStyle:     { backgroundColor: '#F8FAFC' },
+          contentStyle:     { backgroundColor: '#050E1B' },
           animation:        Platform.OS === 'ios' ? 'default' : 'fade',
           gestureEnabled:   true,
           gestureDirection: 'horizontal',
