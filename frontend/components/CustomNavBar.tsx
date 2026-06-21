@@ -41,7 +41,7 @@ const TABS: TabDef[] = [
     route: '/(organizer)/dashboard', match: ['/dashboard','dashboard'],
   },
   {
-    key: 'events', label: 'Évènements',
+    key: 'events', label: 'Events',
     icon: 'calendar-outline', iconActive: 'calendar',
     route: '/(organizer)/events', match: ['/events','events'],
   },
@@ -126,17 +126,14 @@ const TabItem = memo(function TabItem({
             color={active ? '#FFFFFF' : INACTIVE}
             style={{ zIndex: 1 }}
           />
-          {(badge ?? 0) > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeTxt}>{(badge ?? 0) > 9 ? '9+' : badge}</Text>
-            </View>
-          )}
+        
+      
+        
         </View>
         <Text style={[styles.label, active && styles.labelActive]} numberOfLines={1}>
           {tab.label}
         </Text>
-        {/* Active indicator dot */}
-        {active && <View style={styles.dot} />}
+      
       </Animated.View>
     </TouchableOpacity>
   );
@@ -223,7 +220,6 @@ function CustomNavBarInner() {
               key={tab.key}
               tab={tab}
               active={isActive(tab)}
-              badge={tab.key === 'staff' ? pendingN : undefined}
               onPress={() => go(tab.route)}
             />
           ))}
@@ -291,20 +287,8 @@ const styles = StyleSheet.create({
   labelActive: {
     color: '#FFFFFF', fontWeight: '800',
   },
-  dot: {
-    width: 4, height: 4, borderRadius: 2,
-    backgroundColor: BLUE,
-    marginTop: 3,
-    shadowColor: BLUE, shadowOpacity: 0.8, shadowRadius: 4,
-  },
-  badge: {
-    position: 'absolute', top: -1, right: -4,
-    minWidth: 17, height: 17, borderRadius: 9,
-    backgroundColor: 'rgba(255,255,255,0.45)',
-    justifyContent: 'center', alignItems: 'center',
-    paddingHorizontal: 3,
-    borderWidth: 1.5, borderColor: BG,
-  },
+
+ 
   badgeTxt: {
     color: '#FFFFFF', fontSize: 8.5, fontWeight: '900',
   },
