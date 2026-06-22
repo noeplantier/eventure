@@ -1,395 +1,1340 @@
 /**
- * app/(organizer)/dashboard.tsx — EVENTURE v6 (Ultra-Premium)
- * Sophisticated Event Cards & Glass Modal Detail View
- * Dark navy theme — BG #050E1B + Liquid Glass
+ * app/(organizer)/dashboard.tsx — PUT.IN COFFEE Command Hub
+ * Sanur · Bali — Real-time organizer dashboard for Arik
+ * Color system: #020818 BG / #030B1E NAVY / #010610 DEEP — WHITE only
  */
-import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback, useEffect, useMemo, useRef, useState,
+} from 'react';
 import {
-  Animated, Dimensions, FlatList, Image, ScrollView,
-  StyleSheet, Text, TouchableOpacity, View, Pressable, Modal
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { BlurView }        from 'expo-blur';
-import { LinearGradient }  from 'expo-linear-gradient';
-import { Ionicons }        from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { StatusBar }       from 'expo-status-bar';
+import { BlurView }          from 'expo-blur';
+import { LinearGradient }    from 'expo-linear-gradient';
+import { Ionicons }          from '@expo/vector-icons';
+import { StatusBar }         from 'expo-status-bar';
+import { useRouter }         from 'expo-router';
+import { supabase }          from '@/lib/supabase';
+import { sendWhatsApp, broadcastWhatsApp, WAType } from '@/lib/whatsapp';
+import AppHeader             from '@/components/AppHeader';
 
-/* ─── Design tokens ──────────────────────────────────────────────────────── */
-const { width: SW, height: SH } = Dimensions.get('window');
-const BG      = '#050E1B';
-const BLUE    = '#1A9FE3';
-const WHITE   = '#FFFFFF';
-const MUTED   = 'rgba(255,255,255,0.55)';
-const SUCCESS = '#00E676';
-const WARNING = '#FFD54F';
-const DANGER  = '#FF5252';
+/* ─── Design tokens ──────────────────────────────────────────────────────────── */
+const { width: SW } = Dimensions.get('window');
+const BG     = '#020818';
+const NAVY   = '#030B1E';
+const WHITE  = '#FFFFFF';
+const GLASS  = 'rgba(255,255,255,0.06)';
+const BORDER = 'rgba(255,255,255,0.10)';
+const DIM    = 'rgba(255,255,255,0.35)';
+const EDGE   = 20;
+const GRAD   = ['#010610', '#020818', '#030B1E', '#041232', '#020818', '#010610'] as const;
 
-const EDGE = 20;
-const CARD_WIDTH = SW * 0.82; 
-const CARD_HEIGHT = 440;
+/* ─── Constants ──────────────────────────────────────────────────────────────── */
+const ORGANIZER_ID = '4c9525d8-04a6-41fb-beaa-9e9448134819';
+const TODAY        = new Date().toISOString().split('T')[0];
+const IN7          = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
 
-/* ─── Types ──────────────────────────────────────────────────────────────── */
-interface DashEvent {
-  id: string;
-  title: string;
-  date_start: string;
-  location: string;
-  status: 'published' | 'draft' | 'completed';
-  cover_url: string;
-  description: string;
-  staff_needed: number;
-  staff_assigned: number;
+const PUT_IN_TEAM = ['Arik', 'Oka', 'Redo'] as const;
+
+/* ─── Types ──────────────────────────────────────────────────────────────────── */
+interface DBEvent {
+  id         : string;
+  title      : string;
+  type       : string | null;
+  status     : string;
+  date_start : string;
+  date_end   : string | null;
+  location   : string | null;
+  event_roles: { id: string; role: string; slots: number | null; slots_filled: number | null }[];
 }
 
-interface StaffMember {
-  id: string;
-  display_name: string;
-  avatar_url: string | null;
-  status: 'available' | 'assigned' | 'unavailable';
-  current_event_id?: string;
-  role: string;
+interface DBStaff {
+  id           : string;
+  display_name : string;
+  avatar_url   : string | null;
+  is_available : boolean;
 }
 
-/* ─── Helpers ────────────────────────────────────────────────────────────── */
-const daysUntil = (iso: string) => Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000);
-const formatDate = (iso: string) => new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+interface DBAvailability {
+  id           : string;
+  staff_id     : string;
+  date         : string;
+  is_available : boolean;
+}
 
-/* ─── Liquid Glass Card ──────────────────────────────────────────────────── */
-function GlassCard({
-  children, style, radius = 24, tint = 'dark', noBorder = false,
-}: {
-  children: React.ReactNode; style?: any; radius?: number; tint?: 'blue' | 'white' | 'dark' | 'glass'; noBorder?: boolean;
-}) {
-  const tintMap = {
-    blue:   ['rgba(26, 159, 227, 0.15)', 'rgba(26, 159, 227, 0.02)'],
-    white:  ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.02)'],
-    dark:   ['rgba(5, 14, 27, 0.6)', 'rgba(5, 14, 27, 0.2)'],
-    glass:  ['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.0)'],
-  } as const;
-  
+interface DBPayroll {
+  id           : string;
+  staff_id     : string;
+  hours        : number | null;
+  amount       : number | null;
+  status       : 'pending' | 'approved' | 'paid' | string;
+  week_start   : string | null;
+  staff        : { display_name: string } | null;
+}
+
+interface DBActivity {
+  id         : string;
+  staff_id   : string | null;
+  event_type : string | null;
+  created_at : string;
+  staff      : { display_name: string } | null;
+}
+
+/* ─── Helpers ────────────────────────────────────────────────────────────────── */
+const initials = (name: string) => name.slice(0, 2).toUpperCase();
+
+const relativeTime = (iso: string): string => {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1)  return 'maintenant';
+  if (mins < 60) return `${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24)  return `${hrs}h`;
+  return `${Math.floor(hrs / 24)}j`;
+};
+
+const fmtDate = (iso: string) =>
+  new Date(iso).toLocaleDateString('fr-FR', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  });
+
+const fmtWeek = (iso: string) =>
+  new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+
+const payrollStatusLabel = (s: string) => {
+  if (s === 'approved') return 'Approuvé';
+  if (s === 'paid')     return 'Payé';
+  return 'En attente';
+};
+
+const payrollStatusStyle = (s: string) => {
+  if (s === 'paid')     return { borderColor: 'rgba(255,255,255,0.50)', color: WHITE };
+  if (s === 'approved') return { borderColor: 'rgba(255,255,255,0.35)', color: WHITE };
+  return { borderColor: 'rgba(255,255,255,0.20)', color: DIM };
+};
+
+/* ─── ParticleBg ─────────────────────────────────────────────────────────────── */
+function ParticleBg() {
   return (
-    <View style={[{ borderRadius: radius, overflow: 'hidden' }, style]}>
-      {(tint === 'dark' || tint === 'blue') && <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(5,14,27,0.40)' }]}/>}
-      <BlurView intensity={65} tint="dark" style={StyleSheet.absoluteFill}/>
-      <LinearGradient colors={tintMap[tint] as any} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 0.4, y: 1 }} />
-      {!noBorder && (
-        <View style={[StyleSheet.absoluteFill, { borderRadius: radius, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }]} pointerEvents="none"/>
-      )}
-      {children}
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <LinearGradient
+        colors={GRAD}
+        locations={[0, 0.2, 0.4, 0.6, 0.8, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={{
+        position: 'absolute',
+        top: '10%',
+        left: '-20%',
+        right: '-20%',
+        height: '40%',
+        borderRadius: 999,
+        backgroundColor: 'rgba(255,255,255,0.015)',
+      }} />
     </View>
   );
 }
 
-/* ─── Event Detail Modal ─────────────────────────────────────────────────── */
-const EventDetailModal = ({ 
-  visible, evt, onClose, staff 
-}: { 
-  visible: boolean; evt: DashEvent | null; onClose: () => void; staff: StaffMember[] 
-}) => {
-  const insets = useSafeAreaInsets();
-  if (!evt) return null;
+/* ─── Section header ─────────────────────────────────────────────────────────── */
+function SectionHeader({ title, right }: { title: string; right?: React.ReactNode }) {
+  return (
+    <View style={styles.sectionHeaderRow}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {right}
+    </View>
+  );
+}
 
-  const assignedStaff = staff.filter(s => s.current_event_id === evt.id);
-  const fillRatio = Math.min((evt.staff_assigned / (evt.staff_needed || 1)) * 100, 100);
+/* ─── Avatar circle ──────────────────────────────────────────────────────────── */
+function Avatar({ name, size = 38 }: { name: string; size?: number }) {
+  return (
+    <View style={{
+      width: size,
+      height: size,
+      borderRadius: size / 2,
+      backgroundColor: NAVY,
+      borderWidth: 1.5,
+      borderColor: 'rgba(255,255,255,0.20)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    }}>
+      <Text style={{ color: WHITE, fontSize: size * 0.32, fontWeight: '800' }}>
+        {initials(name)}
+      </Text>
+    </View>
+  );
+}
+
+/* ─── Staff Status Cards (Section 1) ────────────────────────────────────────── */
+interface StaffStatusProps {
+  staff        : DBStaff[];
+  availData    : DBAvailability[];
+}
+function StaffStatusSection({ staff, availData }: StaffStatusProps) {
+  const todayAvail = useMemo(() => {
+    const map: Record<string, boolean | undefined> = {};
+    availData.filter(a => a.date === TODAY).forEach(a => { map[a.staff_id] = a.is_available; });
+    return map;
+  }, [availData]);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <BlurView intensity={90} tint="dark" style={StyleSheet.absoluteFill} />
-      <View style={{ flex: 1, backgroundColor: 'rgba(5,14,27,0.75)' }}>
-        
-        {/* Header Image & Close Button */}
-        <View style={{ height: SH * 0.4, width: '100%' }}>
-          <Image source={{ uri: evt.cover_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-          <LinearGradient colors={['rgba(0,0,0,0.5)', 'transparent', BG]} locations={[0, 0.5, 1]} style={StyleSheet.absoluteFill} />
-          
-          <TouchableOpacity onPress={onClose} style={{ position: 'absolute', top: insets.top + 10, right: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(10px)' }}>
-            <Ionicons name="close" size={24} color={WHITE} />
-          </TouchableOpacity>
+    <View style={styles.section}>
+      <SectionHeader title="Équipe · Aujourd'hui" />
+      <View style={styles.staffRow}>
+        {staff.map(member => {
+          const avail = todayAvail[member.id];
+          const isAvailable = avail === true;
+          const isUndefined  = avail === undefined;
+
+          return (
+            <View key={member.id} style={styles.staffCard}>
+              <Avatar name={member.display_name} size={38} />
+              <Text style={styles.staffName}>{member.display_name}</Text>
+              {/* Availability dot */}
+              <View style={{
+                width: 10,
+                height: 10,
+                borderRadius: 5,
+                backgroundColor: isAvailable
+                  ? WHITE
+                  : isUndefined
+                    ? 'rgba(255,255,255,0.20)'
+                    : 'rgba(255,255,255,0.20)',
+                opacity: isAvailable ? 1 : 0.4,
+              }} />
+              <Text style={styles.staffAvailLabel}>
+                {isAvailable ? 'Dispo' : isUndefined ? '—' : 'Indispo'}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+/* ─── Event List (Section 2) ─────────────────────────────────────────────────── */
+interface EventListProps {
+  events : DBEvent[];
+  staff  : DBStaff[];
+  onPress: (id: string) => void;
+}
+function EventListSection({ events, staff, onPress }: EventListProps) {
+  const upcoming = useMemo(
+    () => events.filter(e => e.status !== 'completed').slice(0, 3),
+    [events],
+  );
+
+  if (upcoming.length === 0) {
+    return (
+      <View style={styles.section}>
+        <SectionHeader title="Cette semaine" />
+        <View style={styles.emptyState}>
+          <Ionicons name="calendar-outline" size={32} color={DIM} />
+          <Text style={styles.emptyText}>Aucun événement à venir</Text>
         </View>
+      </View>
+    );
+  }
 
-        {/* Content Body */}
-        <ScrollView style={{ flex: 1, marginTop: -40 }} contentContainerStyle={{ padding: EDGE, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-          
-          <View style={{ gap: 16, marginBottom: 32 }}>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <View style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: `${BLUE}33`, borderWidth: 1, borderColor: BLUE }}>
-                <Text style={{ color: BLUE, fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>{evt.location}</Text>
+  return (
+    <View style={styles.section}>
+      <SectionHeader title="Cette semaine" />
+      <View style={{ gap: 12, paddingHorizontal: EDGE }}>
+        {upcoming.map(evt => {
+          const isPublished = evt.status === 'published';
+          const statusBorderColor = isPublished
+            ? 'rgba(255,255,255,0.50)'
+            : 'rgba(255,255,255,0.20)';
+          const statusTextColor = isPublished ? WHITE : DIM;
+          const statusLabel = isPublished ? 'Publié' : 'Brouillon';
+
+          return (
+            <TouchableOpacity
+              key={evt.id}
+              style={styles.eventCard}
+              onPress={() => onPress(evt.id)}
+              activeOpacity={0.82}
+            >
+              {/* Top row: title + status */}
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.eventCardTitle} numberOfLines={2}>{evt.title}</Text>
+                </View>
+                <View style={[styles.statusBadge, { borderColor: statusBorderColor }]}>
+                  <Text style={[styles.statusBadgeText, { color: statusTextColor }]}>
+                    {statusLabel}
+                  </Text>
+                </View>
               </View>
-              <View style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)' }}>
-                <Text style={{ color: WHITE, fontSize: 12, fontWeight: '700' }}>{formatDate(evt.date_start)}</Text>
+
+              {/* Type pill */}
+              {evt.type ? (
+                <View style={styles.typePill}>
+                  <Text style={styles.typePillText}>{evt.type}</Text>
+                </View>
+              ) : null}
+
+              {/* Date + location */}
+              <View style={{ gap: 4, marginTop: 6 }}>
+                <View style={styles.metaRow}>
+                  <Ionicons name="calendar-outline" size={12} color={WHITE} />
+                  <Text style={styles.metaText}>{fmtDate(evt.date_start)}</Text>
+                </View>
+                {evt.location ? (
+                  <View style={styles.metaRow}>
+                    <Ionicons name="location-outline" size={12} color={WHITE} />
+                    <Text style={styles.metaText}>{evt.location}</Text>
+                  </View>
+                ) : null}
               </View>
-            </View>
 
-            <Text style={{ color: WHITE, fontSize: 36, fontWeight: '900', lineHeight: 40 }}>{evt.title}</Text>
-            <Text style={{ color: MUTED, fontSize: 15, lineHeight: 24, fontWeight: '500' }}>{evt.description}</Text>
-          </View>
-
-          {/* Staff Analytics Card */}
-          <GlassCard tint="dark" radius={20} style={{ padding: 20, marginBottom: 32 }}>
-            <Text style={{ color: WHITE, fontSize: 18, fontWeight: '800', marginBottom: 16 }}>Ressources Humaines</Text>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 8 }}>
-              <View>
-                <Text style={{ color: WHITE, fontSize: 24, fontWeight: '900' }}>{evt.staff_assigned} <Text style={{ fontSize: 16, color: MUTED }}>/ {evt.staff_needed}</Text></Text>
-                <Text style={{ color: MUTED, fontSize: 13, fontWeight: '600' }}>Staff assigné vs Requis</Text>
-              </View>
-              <Text style={{ color: fillRatio === 100 ? SUCCESS : BLUE, fontSize: 16, fontWeight: '800' }}>{Math.round(fillRatio)}%</Text>
-            </View>
-            
-            <View style={{ height: 8, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 4, overflow: 'hidden', marginVertical: 12 }}>
-              <View style={{ height: '100%', width: `${fillRatio}%`, backgroundColor: fillRatio >= 100 ? SUCCESS : BLUE, borderRadius: 4 }} />
-            </View>
-
-            {/* Avatars de l'équipe assignée */}
-            {assignedStaff.length > 0 && (
-              <View style={{ flexDirection: 'row', marginTop: 12 }}>
-                {assignedStaff.slice(0, 5).map((s, i) => (
-                  <View key={s.id} style={{ marginLeft: i > 0 ? -12 : 0, borderWidth: 2, borderColor: '#101B2E', borderRadius: 20 }}>
-                    {s.avatar_url ? 
-                      <Image source={{ uri: s.avatar_url }} style={{ width: 36, height: 36, borderRadius: 18 }} /> :
-                      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: BLUE, alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: WHITE, fontSize: 14, fontWeight: 'bold' }}>{s.display_name[0]}</Text></View>
-                    }
+              {/* Staff availability dots row */}
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, alignItems: 'center' }}>
+                {staff.map(s => (
+                  <View key={s.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <View style={{
+                      width: 7, height: 7, borderRadius: 3.5,
+                      backgroundColor: s.is_available ? WHITE : 'rgba(255,255,255,0.20)',
+                    }} />
+                    <Text style={{ color: DIM, fontSize: 10, fontWeight: '500' }}>{s.display_name}</Text>
                   </View>
                 ))}
-                {assignedStaff.length > 5 && (
-                  <View style={{ marginLeft: -12, borderWidth: 2, borderColor: '#101B2E', borderRadius: 20, width: 36, height: 36, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ color: WHITE, fontSize: 12, fontWeight: 'bold' }}>+{assignedStaff.length - 5}</Text>
-                  </View>
-                )}
               </View>
-            )}
-          </GlassCard>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
 
-          {/* Action Button */}
-          <TouchableOpacity style={{ backgroundColor: BLUE, borderRadius: 16, paddingVertical: 18, alignItems: 'center', shadowColor: BLUE, shadowOpacity: 0.4, shadowRadius: 15, shadowOffset: { width: 0, height: 8 } }}>
-            <Text style={{ color: WHITE, fontSize: 16, fontWeight: '800' }}>Gérer le Staff pour cet Événement</Text>
-          </TouchableOpacity>
+/* ─── Availability Grid (Section 3) ─────────────────────────────────────────── */
+interface AvailGridProps {
+  staff    : DBStaff[];
+  availData: DBAvailability[];
+  onToggle : (staffId: string, date: string, current: boolean | undefined) => void;
+}
+function AvailabilityGridSection({ staff, availData, onToggle }: AvailGridProps) {
+  const DAYS = useMemo(() => Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    return {
+      dateStr: d.toISOString().split('T')[0],
+      label  : d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' }).toUpperCase(),
+    };
+  }), []);
 
+  const availMap = useMemo(() => {
+    const map: Record<string, Record<string, boolean>> = {};
+    availData.forEach(row => {
+      if (!map[row.staff_id]) map[row.staff_id] = {};
+      map[row.staff_id][row.date] = row.is_available;
+    });
+    return map;
+  }, [availData]);
+
+  // Filter to only Put.in Coffee staff (Arik, Oka, Redo)
+  const teamStaff = useMemo(
+    () => staff.filter(s => PUT_IN_TEAM.includes(s.display_name as typeof PUT_IN_TEAM[number])),
+    [staff],
+  );
+
+  return (
+    <View style={styles.section}>
+      <SectionHeader
+        title="Disponibilités · 7 jours"
+        right={
+          <View style={styles.weekPill}>
+            <Text style={styles.weekPillText}>Semaine</Text>
+          </View>
+        }
+      />
+      <View style={[styles.glassCard, { marginHorizontal: EDGE }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={{ paddingHorizontal: 12, paddingVertical: 14 }}>
+            {/* Header row */}
+            <View style={{ flexDirection: 'row', marginBottom: 10 }}>
+              <View style={{ width: 72 }} />
+              {DAYS.map(d => (
+                <View key={d.dateStr} style={styles.gridCell}>
+                  <Text style={styles.gridDayLabel}>{d.label}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Staff rows */}
+            {teamStaff.map(member => {
+              const staffAvail = availMap[member.id] ?? {};
+              return (
+                <View key={member.id} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                  {/* Avatar + name */}
+                  <View style={{ width: 72, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Avatar name={member.display_name} size={24} />
+                    <Text style={{ color: WHITE, fontSize: 10, fontWeight: '600' }} numberOfLines={1}>
+                      {member.display_name.length > 6
+                        ? member.display_name.slice(0, 6)
+                        : member.display_name}
+                    </Text>
+                  </View>
+                  {/* Day cells */}
+                  {DAYS.map(d => {
+                    const val = staffAvail[d.dateStr];
+                    const isAvail = val === true;
+                    const isDefined = val !== undefined;
+                    return (
+                      <TouchableOpacity
+                        key={d.dateStr}
+                        style={styles.gridCell}
+                        onPress={() => onToggle(member.id, d.dateStr, val)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: 12,
+                          backgroundColor: isAvail ? WHITE : isDefined ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)',
+                          borderWidth: 1,
+                          borderColor: isAvail ? WHITE : 'rgba(255,255,255,0.15)',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          {isDefined && (
+                            <Ionicons
+                              name={isAvail ? 'checkmark' : 'close'}
+                              size={12}
+                              color={isAvail ? '#020818' : DIM}
+                            />
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              );
+            })}
+          </View>
         </ScrollView>
       </View>
-    </Modal>
+    </View>
   );
-};
+}
 
-/* ─── Interactive Event Card (Ultra Sophisticated) ───────────────────────── */
-const EventCard = memo(({ evt, isActive, onPress }: { evt: DashEvent; isActive: boolean; onPress: () => void }) => {
-  const scale = useRef(new Animated.Value(1)).current;
+/* ─── Payroll Section (Section 4) ────────────────────────────────────────────── */
+interface PayrollSectionProps {
+  payroll: DBPayroll[];
+  onNavigate: () => void;
+}
+function PayrollSection({ payroll, onNavigate }: PayrollSectionProps) {
+  const total = useMemo(
+    () => payroll.reduce((acc, p) => acc + (p.amount ?? 0), 0),
+    [payroll],
+  );
+
+  const weekStart = payroll[0]?.week_start ?? TODAY;
+
+  return (
+    <View style={styles.section}>
+      <SectionHeader title="Paie · Cette semaine" />
+      <View style={[styles.glassCard, { marginHorizontal: EDGE }]}>
+        {/* Week label */}
+        <View style={styles.payrollWeekRow}>
+          <Ionicons name="wallet-outline" size={14} color={WHITE} />
+          <Text style={styles.payrollWeekText}>
+            Semaine du {fmtWeek(weekStart)} au {fmtWeek(IN7)}
+          </Text>
+        </View>
+
+        {payroll.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>Aucune paie en attente</Text>
+          </View>
+        ) : (
+          <View style={{ gap: 10, marginTop: 12 }}>
+            {payroll.map(p => {
+              const pStyle = payrollStatusStyle(p.status);
+              return (
+                <View key={p.id} style={styles.payrollRow}>
+                  <Avatar name={p.staff?.display_name ?? '?'} size={32} />
+                  <Text style={styles.payrollName} numberOfLines={1}>
+                    {p.staff?.display_name ?? '—'}
+                  </Text>
+                  <Text style={styles.payrollHours}>{p.hours ?? 0}h</Text>
+                  <Text style={styles.payrollAmount}>{p.amount ?? 0}€</Text>
+                  <View style={[styles.payrollStatus, { borderColor: pStyle.borderColor }]}>
+                    <Text style={[styles.payrollStatusText, { color: pStyle.color }]}>
+                      {payrollStatusLabel(p.status)}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Footer */}
+        <View style={styles.payrollFooter}>
+          <TouchableOpacity onPress={onNavigate} activeOpacity={0.7}>
+            <Text style={styles.payrollDetailsLink}>Voir détails →</Text>
+          </TouchableOpacity>
+          <Text style={styles.payrollTotal}>Total : {total}€</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/* ─── Activity Feed (Section 5) ─────────────────────────────────────────────── */
+function ActivitySection({ activity }: { activity: DBActivity[] }) {
+  return (
+    <View style={styles.section}>
+      <SectionHeader title="Activité récente" />
+      {activity.length === 0 ? (
+        <View style={[styles.emptyState, { paddingHorizontal: EDGE }]}>
+          <Ionicons name="time-outline" size={32} color={DIM} />
+          <Text style={styles.emptyText}>Aucune activité</Text>
+        </View>
+      ) : (
+        <View style={{ gap: 1, paddingHorizontal: EDGE }}>
+          {activity.map((item, i) => {
+            const name = item.staff?.display_name ?? 'Inconnu';
+            const eventLabel = item.event_type === 'available'
+              ? 'Disponible'
+              : item.event_type === 'unavailable'
+                ? 'Indisponible'
+                : item.event_type ?? 'Activité';
+            return (
+              <View key={item.id} style={[
+                styles.activityRow,
+                i < activity.length - 1 && { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
+              ]}>
+                <Avatar name={name} size={32} />
+                <View style={{ flex: 1, marginHorizontal: 12 }}>
+                  <Text style={styles.activityName} numberOfLines={1}>
+                    {name} · <Text style={{ color: WHITE, fontWeight: '400' }}>{eventLabel}</Text>
+                  </Text>
+                  <Text style={styles.activityDate}>
+                    Le {new Date(item.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                    {' · '}
+                    {new Date(item.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                </View>
+                <Text style={styles.activityTime}>{relativeTime(item.created_at)}</Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
+/* ─── Quick Actions (Section 6) ─────────────────────────────────────────────── */
+interface QuickActionsProps {
+  onWA      : () => void;
+  onEvent   : () => void;
+  onPayroll : () => void;
+  onNotifs  : () => void;
+}
+function QuickActionsSection({ onWA, onEvent, onPayroll, onNotifs }: QuickActionsProps) {
+  const ACTIONS = [
+    { icon: 'logo-whatsapp' as const,       label: 'WhatsApp', onPress: onWA },
+    { icon: 'calendar-outline' as const,    label: 'Événement', onPress: onEvent },
+    { icon: 'cash-outline' as const,        label: 'Paie',      onPress: onPayroll },
+    { icon: 'notifications-outline' as const, label: 'Notifs', onPress: onNotifs },
+  ];
+  return (
+    <View style={styles.section}>
+      <SectionHeader title="Actions rapides" />
+      <View style={styles.actionsGrid}>
+        {ACTIONS.map(a => (
+          <TouchableOpacity
+            key={a.label}
+            style={styles.actionBtn}
+            onPress={a.onPress}
+            activeOpacity={0.75}
+          >
+            <Ionicons name={a.icon} size={24} color={WHITE} />
+            <Text style={styles.actionLabel}>{a.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+/* ─── WhatsApp Modal ─────────────────────────────────────────────────────────── */
+interface WAModalProps {
+  visible  : boolean;
+  staff    : DBStaff[];
+  onClose  : () => void;
+}
+function WAModal({ visible, staff, onClose }: WAModalProps) {
+  const slideAnim = useRef(new Animated.Value(600)).current;
+
+  const [selectedStaff, setSelectedStaff] = useState<string | 'broadcast'>('broadcast');
+  const [msgType, setMsgType]             = useState<WAType>('general');
+  const [customMsg, setCustomMsg]         = useState('');
+  const [sending, setSending]             = useState(false);
+  const [feedback, setFeedback]           = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
-    Animated.spring(scale, { toValue: isActive ? 1 : 0.92, friction: 6, tension: 40, useNativeDriver: true }).start();
-  }, [isActive]);
+    Animated.spring(slideAnim, {
+      toValue: visible ? 0 : 600,
+      friction: 14,
+      tension: 90,
+      useNativeDriver: true,
+    }).start();
+    if (!visible) {
+      setFeedback(null);
+      setCustomMsg('');
+      setSending(false);
+    }
+  }, [visible]);
 
-  const days = daysUntil(evt.date_start);
-  const fillRatio = Math.min((evt.staff_assigned / (evt.staff_needed || 1)) * 100, 100);
+  const MSG_TYPES: { key: WAType; label: string }[] = [
+    { key: 'general',          label: 'Message général' },
+    { key: 'shift_assigned',   label: 'Shift assigné' },
+    { key: 'availability_ask', label: 'Demande dispo' },
+    { key: 'payroll_approved', label: 'Paie approuvée' },
+  ];
+
+  const teamStaff = useMemo(
+    () => staff.filter(s => ['Oka', 'Redo'].includes(s.display_name)),
+    [staff],
+  );
+
+  const handleSend = useCallback(async () => {
+    setSending(true);
+    setFeedback(null);
+    try {
+      if (selectedStaff === 'broadcast') {
+        const results = await broadcastWhatsApp(msgType, customMsg || undefined);
+        const allOk = results.every(r => r.ok);
+        setFeedback({ ok: allOk, text: allOk ? 'Messages envoyés à toute l\'équipe !' : 'Certains messages ont échoué.' });
+      } else {
+        const result = await sendWhatsApp(selectedStaff, msgType, customMsg || undefined);
+        setFeedback({
+          ok  : result.ok,
+          text: result.ok
+            ? 'Message envoyé !'
+            : result.error ?? 'Erreur lors de l\'envoi',
+        });
+      }
+    } catch (e: any) {
+      setFeedback({ ok: false, text: e.message ?? 'Erreur inconnue' });
+    } finally {
+      setSending(false);
+    }
+  }, [selectedStaff, msgType, customMsg]);
 
   return (
-    <Pressable onPress={onPress}>
-      <Animated.View style={{ transform: [{ scale }], marginRight: 20, width: CARD_WIDTH, opacity: isActive ? 1 : 0.5 }}>
-        {isActive && (
-          <LinearGradient colors={[BLUE, 'transparent']} style={[StyleSheet.absoluteFill, { top: -10, bottom: -10, left: -10, right: -10, borderRadius: 34, opacity: 0.3, filter: 'blur(20px)' }]} pointerEvents="none" />
-        )}
-        
-        <GlassCard tint="dark" radius={28} style={{ height: CARD_HEIGHT }}>
-          <Image source={{ uri: evt.cover_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-          <LinearGradient colors={['rgba(5,14,27,0.1)', 'rgba(5,14,27,0.7)', '#050E1B']} locations={[0, 0.4, 1]} style={StyleSheet.absoluteFill} />
-          
-          <View style={{ padding: 24, flex: 1, justifyContent: 'space-between' }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <GlassCard tint="glass" radius={14} noBorder style={{ paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }}>
-                <Text style={{ color: WHITE, fontSize: 12, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1 }}>
-                  {days <= 0 ? "AUJOURD'HUI" : `J-${days}`}
-                </Text>
-              </GlassCard>
-            </View>
+    <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      <Animated.View style={[styles.modal, { transform: [{ translateY: slideAnim }] }]}>
+        <BlurView intensity={90} tint="dark" style={StyleSheet.absoluteFill} />
+        <View style={styles.modalHandle} />
 
-            <View style={{ gap: 16 }}>
-              <View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                  <Ionicons name="location" size={14} color={BLUE} />
-                  <Text style={{ color: BLUE, fontSize: 13, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>{evt.location}</Text>
-                </View>
-                <Text style={{ color: WHITE, fontSize: 32, fontWeight: '900', lineHeight: 36, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }} numberOfLines={2}>
-                  {evt.title}
+        <Text style={styles.modalTitle}>WhatsApp · Équipe</Text>
+
+        {/* Staff selector */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 18 }}>
+          <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: EDGE }}>
+            {/* Broadcast chip */}
+            <TouchableOpacity
+              style={[styles.staffChip, selectedStaff === 'broadcast' && styles.staffChipActive]}
+              onPress={() => setSelectedStaff('broadcast')}
+            >
+              <Ionicons name="megaphone-outline" size={14} color={WHITE} />
+              <Text style={[styles.staffChipText, selectedStaff === 'broadcast' && { color: BG }]}>
+                Tout le monde
+              </Text>
+            </TouchableOpacity>
+
+            {teamStaff.map(s => (
+              <TouchableOpacity
+                key={s.id}
+                style={[styles.staffChip, selectedStaff === s.id && styles.staffChipActive]}
+                onPress={() => setSelectedStaff(s.id)}
+              >
+                <Avatar name={s.display_name} size={20} />
+                <Text style={[styles.staffChipText, selectedStaff === s.id && { color: BG }]}>
+                  {s.display_name}
                 </Text>
-              </View>
-              
-              <GlassCard tint="glass" radius={20} style={{ padding: 16 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <Text style={{ color: MUTED, fontSize: 13, fontWeight: '600' }}>Équipe mobilisée</Text>
-                  <Text style={{ color: WHITE, fontSize: 15, fontWeight: '900' }}>{evt.staff_assigned} <Text style={{ color: MUTED, fontSize: 13, fontWeight: '600' }}>/ {evt.staff_needed}</Text></Text>
-                </View>
-                <View style={{ height: 6, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 3, overflow: 'hidden' }}>
-                  <View style={{ height: '100%', width: `${fillRatio}%`, backgroundColor: fillRatio >= 100 ? SUCCESS : BLUE, borderRadius: 3 }} />
-                </View>
-              </GlassCard>
-            </View>
+              </TouchableOpacity>
+            ))}
           </View>
-          
-          {isActive && <View style={[StyleSheet.absoluteFill, { borderRadius: 28, borderWidth: 1.5, borderColor: BLUE }]} pointerEvents="none" />}
-        </GlassCard>
+        </ScrollView>
+
+        {/* Message type */}
+        <View style={{ paddingHorizontal: EDGE, gap: 8, marginBottom: 16 }}>
+          <Text style={styles.modalLabel}>Type de message</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {MSG_TYPES.map(t => (
+              <TouchableOpacity
+                key={t.key}
+                style={[styles.typeChip, msgType === t.key && styles.typeChipActive]}
+                onPress={() => setMsgType(t.key)}
+              >
+                <Text style={[styles.typeChipText, msgType === t.key && { color: BG }]}>
+                  {t.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Custom message input */}
+        <View style={{ paddingHorizontal: EDGE, marginBottom: 20 }}>
+          <Text style={styles.modalLabel}>Message (optionnel)</Text>
+          <TextInput
+            style={styles.msgInput}
+            placeholder="Ajouter un message personnalisé..."
+            placeholderTextColor={DIM}
+            value={customMsg}
+            onChangeText={setCustomMsg}
+            multiline
+            numberOfLines={3}
+          />
+        </View>
+
+        {/* Feedback */}
+        {feedback && (
+          <View style={[styles.feedbackRow, { borderColor: feedback.ok ? 'rgba(255,255,255,0.40)' : 'rgba(255,255,255,0.20)' }]}>
+            <Ionicons
+              name={feedback.ok ? 'checkmark-circle-outline' : 'alert-circle-outline'}
+              size={16}
+              color={feedback.ok ? WHITE : DIM}
+            />
+            <Text style={[styles.feedbackText, { color: feedback.ok ? WHITE : DIM }]}>
+              {feedback.text}
+            </Text>
+          </View>
+        )}
+
+        {/* Send button */}
+        <View style={{ paddingHorizontal: EDGE, gap: 12 }}>
+          <TouchableOpacity
+            style={styles.sendBtn}
+            onPress={handleSend}
+            disabled={sending}
+            activeOpacity={0.8}
+          >
+            {sending ? (
+              <ActivityIndicator color={BG} size="small" />
+            ) : (
+              <>
+                <Ionicons name="logo-whatsapp" size={18} color={BG} />
+                <Text style={styles.sendBtnText}>Envoyer</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.cancelBtn} onPress={onClose} activeOpacity={0.7}>
+            <Text style={styles.cancelBtnText}>Annuler</Text>
+          </TouchableOpacity>
+        </View>
       </Animated.View>
-    </Pressable>
+    </Modal>
   );
-});
+}
 
-/* ─── Staff Card (Carousel) ──────────────────────────────────────────────── */
-const StaffCard = memo(({ member }: { member: StaffMember }) => {
-  const statusColors = { available: SUCCESS, assigned: WARNING, unavailable: DANGER };
-  const statusLabels = { available: 'Disponible', assigned: 'En mission', unavailable: 'Indisponible' };
-  const color = statusColors[member.status];
-
-  return (
-    <GlassCard tint="white" radius={20} style={{ width: 140, marginRight: 14, height: 180 }}>
-      <View style={{ padding: 16, alignItems: 'center', flex: 1, justifyContent: 'center', gap: 12 }}>
-        <View style={{ position: 'relative' }}>
-          {member.avatar_url ? (
-            <Image source={{ uri: member.avatar_url }} style={{ width: 68, height: 68, borderRadius: 34 }} />
-          ) : (
-            <View style={{ width: 68, height: 68, borderRadius: 34, backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
-              <Text style={{ color: WHITE, fontWeight: '800', fontSize: 24 }}>{member.display_name.charAt(0)}</Text>
-            </View>
-          )}
-          <View style={{ position: 'absolute', bottom: 2, right: 2, width: 18, height: 18, borderRadius: 9, backgroundColor: color, borderWidth: 3, borderColor: '#101B2E' }}/>
-        </View>
-
-        <View style={{ alignItems: 'center', gap: 4 }}>
-          <Text style={{ color: WHITE, fontSize: 14, fontWeight: '800', textAlign: 'center' }} numberOfLines={1}>{member.display_name}</Text>
-          <Text style={{ color: MUTED, fontSize: 11, textAlign: 'center', fontWeight: '600' }}>{member.role}</Text>
-        </View>
-      </View>
-    </GlassCard>
-  );
-});
-
-/* ─── SCREEN ─────────────────────────────────────────────────────────────── */
+/* ─── MAIN SCREEN ────────────────────────────────────────────────────────────── */
 export default function Dashboard() {
-  const insets  = useSafeAreaInsets();
-  
-  // --- MOCK DATA : 15 Événements ---
-  const [events] = useState<DashEvent[]>([
-    { id: 'e1', title: 'PUFFERS Visual Exhibition', date_start: new Date(Date.now() + 86400000 * 2).toISOString(), location: 'Galerie Perrotin', status: 'published', description: "Vernissage exclusif de la série thématique 'PUFFERS'. Mise en place des 5 décors distincts générés par IA. Requiert un staff spécialisé en scénographie et accueil VIP.", cover_url: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?q=80&w=1000', staff_needed: 12, staff_assigned: 10 },
-    { id: 'e2', title: 'Le Compagnon de Voyage Launch', date_start: new Date(Date.now() + 86400000 * 5).toISOString(), location: 'Station F, Paris', status: 'published', description: "Événement de lancement officiel pour l'application mobile 'Culturel' Travel Companion. Démonstrations en direct des workflows IA et GitHub.", cover_url: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?q=80&w=1000', staff_needed: 20, staff_assigned: 20 },
-    { id: 'e3', title: 'Solidays 2026', date_start: new Date(Date.now() + 86400000 * 12).toISOString(), location: 'Paris Longchamp', status: 'published', description: "Festival majeur de l'été. Gros besoin en sécurité, bar, et logistique pour gérer le flux continu de festivaliers sur 3 jours.", cover_url: 'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?q=80&w=1000', staff_needed: 55, staff_assigned: 42 },
-    { id: 'e4', title: 'Tech Gala Night', date_start: new Date(Date.now() + 86400000 * 18).toISOString(), location: 'Lyon Confluence', status: 'published', description: "Soirée de gala pour les acteurs de la tech lyonnaise. Tenue correcte exigée pour le staff, service au plateau de rigueur.", cover_url: 'https://images.unsplash.com/photo-1540039155733-d7696c4bc063?q=80&w=1000', staff_needed: 15, staff_assigned: 15 },
-    { id: 'e5', title: 'Mobile Dev Workflow Con', date_start: new Date(Date.now() + 86400000 * 25).toISOString(), location: 'Lille Grand Palais', status: 'draft', description: "Convention dédiée aux stacks techniques AI-first et à l'intégration Google AI Studio. Besoin d'hôtes techniques pour assister les speakers.", cover_url: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?q=80&w=1000', staff_needed: 18, staff_assigned: 5 },
-    { id: 'e6', title: 'Summer Vibe Fest', date_start: new Date(Date.now() + 86400000 * 30).toISOString(), location: 'Plage du Prado', status: 'published', description: "Festival électro les pieds dans le sable. Nécessite une équipe endurante pour la gestion des bars et des accès VIP.", cover_url: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=1000', staff_needed: 30, staff_assigned: 12 },
-    { id: 'e7', title: 'E-Sport Championship', date_start: new Date(Date.now() + 86400000 * 40).toISOString(), location: 'Accor Arena', status: 'published', description: "Finale européenne. Énorme dispositif technique et régie. Le staff doit être bilingue anglais.", cover_url: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1000', staff_needed: 40, staff_assigned: 38 },
-    { id: 'e8', title: 'Paris Fashion Week', date_start: new Date(Date.now() + 86400000 * 45).toISOString(), location: 'Grand Palais', status: 'draft', description: "Défilés de haute couture. Staff trié sur le volet, discrétion absolue et réactivité requises pour l'accueil des célébrités.", cover_url: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1000', staff_needed: 50, staff_assigned: 10 },
-    { id: 'e9', title: 'Food & Wine Expo', date_start: new Date(Date.now() + 86400000 * 50).toISOString(), location: 'Bordeaux', status: 'published', description: "Salon de dégustation. Recherche de sommeliers et d'animateurs de stands culinaires.", cover_url: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?q=80&w=1000', staff_needed: 35, staff_assigned: 30 },
-    { id: 'e10', title: 'Startup Pitch Night', date_start: new Date(Date.now() + 86400000 * 60).toISOString(), location: 'Nantes', status: 'published', description: "Soirée networking pour identifier les concepts mobiles de 2026. Staff d'accueil dynamique.", cover_url: 'https://images.unsplash.com/photo-1559136555-e46be3620950?q=80&w=1000', staff_needed: 12, staff_assigned: 8 },
-    { id: 'e11', title: 'Crypto & Web3 Meetup', date_start: new Date(Date.now() + 86400000 * 65).toISOString(), location: 'Strasbourg', status: 'draft', description: "Conférence technique sur la blockchain. Besoin de modérateurs pour les salles de conférence.", cover_url: 'https://images.unsplash.com/photo-1621416894569-0f39ed31d247?q=80&w=1000', staff_needed: 15, staff_assigned: 2 },
-    { id: 'e12', title: 'Yoga & Wellness Retreat', date_start: new Date(Date.now() + 86400000 * 75).toISOString(), location: 'Annecy', status: 'published', description: "Retraite de 4 jours. Staff d'encadrement doux et discret pour la logistique des repas et des ateliers.", cover_url: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=1000', staff_needed: 8, staff_assigned: 8 },
-    { id: 'e13', title: 'Future of Design Symposium', date_start: new Date(Date.now() + 86400000 * 80).toISOString(), location: 'Toulouse', status: 'draft', description: "Symposium sur la direction artistique générative. Profils tech & art demandés.", cover_url: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?q=80&w=1000', staff_needed: 20, staff_assigned: 0 },
-    { id: 'e14', title: 'AI Ethics Round Table', date_start: new Date(Date.now() + 86400000 * 90).toISOString(), location: 'Genève', status: 'published', description: "Sommet international. Haute sécurité et hôtesses d'accueil VIP.", cover_url: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?q=80&w=1000', staff_needed: 25, staff_assigned: 15 },
-    { id: 'e15', title: 'Jazz Festival Finale', date_start: new Date(Date.now() - 86400000 * 5).toISOString(), location: 'Montreux', status: 'completed', description: "Clôture du festival de Jazz. Démontage et gestion des foules de fin de soirée.", cover_url: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?q=80&w=1000', staff_needed: 25, staff_assigned: 25 },
-  ]);
+  const router = useRouter();
 
-  // --- MOCK DATA : 15 Staff ---
-  const [staff] = useState<StaffMember[]>([
-    { id: 's1', display_name: 'Léa Martin', avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200', status: 'assigned', current_event_id: 'e1', role: 'Scénographe' },
-    { id: 's2', display_name: 'Tom Dubois', avatar_url: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=200', status: 'available', role: 'Sécurité' },
-    { id: 's3', display_name: 'Sarah Connor', avatar_url: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200', status: 'assigned', current_event_id: 'e3', role: 'Barman' },
-    { id: 's4', display_name: 'Hugo Lloris', avatar_url: null, status: 'unavailable', role: 'Technicien Son' },
-    { id: 's5', display_name: 'Emma Watson', avatar_url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200', status: 'available', role: 'Accueil VIP' },
-    { id: 's6', display_name: 'Marc Z.', avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200', status: 'assigned', current_event_id: 'e2', role: 'Développeur IA' },
-    { id: 's7', display_name: 'Julie D.', avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', status: 'assigned', current_event_id: 'e1', role: 'Directrice Artistique' },
-    { id: 's8', display_name: 'Antoine G.', avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200', status: 'available', role: 'Logistique' },
-    { id: 's9', display_name: 'Clara M.', avatar_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200', status: 'unavailable', role: 'Coordinatrice' },
-    { id: 's10', display_name: 'Lucas B.', avatar_url: 'https://images.unsplash.com/photo-1552058544-f2b08422138a?w=200', status: 'assigned', current_event_id: 'e7', role: 'Régisseur Général' },
-    { id: 's11', display_name: 'Sophie T.', avatar_url: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200', status: 'assigned', current_event_id: 'e2', role: 'Guide Culturel' },
-    { id: 's12', display_name: 'Maxime R.', avatar_url: null, status: 'assigned', current_event_id: 'e5', role: 'Intégrateur Tech' },
-    { id: 's13', display_name: 'Chloé P.', avatar_url: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200', status: 'assigned', current_event_id: 'e9', role: 'Sommelière' },
-    { id: 's14', display_name: 'Alex V.', avatar_url: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=200', status: 'available', role: 'Sécurité' },
-    { id: 's15', display_name: 'Nina K.', avatar_url: 'https://images.unsplash.com/photo-1517365830460-955ce3ccd263?w=200', status: 'unavailable', role: 'Photographe' },
-  ]);
+  /* State */
+  const [loading, setLoading]       = useState(true);
+  const [events, setEvents]         = useState<DBEvent[]>([]);
+  const [staff, setStaff]           = useState<DBStaff[]>([]);
+  const [availData, setAvailData]   = useState<DBAvailability[]>([]);
+  const [payroll, setPayroll]       = useState<DBPayroll[]>([]);
+  const [activity, setActivity]     = useState<DBActivity[]>([]);
+  const [notifCount, setNotifCount] = useState(0);
+  const [showNotifs, setShowNotifs] = useState(false);
+  const [waVisible, setWaVisible]   = useState(false);
 
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(events[0].id);
-  const [modalEvent, setModalEvent] = useState<DashEvent | null>(null);
+  /* Data fetch */
+  const fetchAll = useCallback(async () => {
+    try {
+      const [evRes, stRes, avRes, paRes, notifRes, actRes] = await Promise.all([
+        supabase
+          .from('events')
+          .select('*, event_roles(*)')
+          .order('date_start', { ascending: true }),
+        supabase
+          .from('staff')
+          .select('*')
+          .in('display_name', [...PUT_IN_TEAM]),
+        supabase
+          .from('staff_availability')
+          .select('*')
+          .gte('date', TODAY)
+          .lte('date', IN7),
+        supabase
+          .from('payroll')
+          .select('*, staff(display_name)')
+          .in('status', ['pending', 'approved']),
+        supabase
+          .from('notifications')
+          .select('id')
+          .eq('read', false)
+          .eq('organizer_id', ORGANIZER_ID),
+        supabase
+          .from('availability_events')
+          .select('*, staff(display_name)')
+          .order('created_at', { ascending: false })
+          .limit(10),
+      ]);
 
-  // Gère le double comportement : sélectionner pour le filtre + ouvrir la modale
-  const handleEventPress = (evt: DashEvent) => {
-    setSelectedEventId(evt.id);
-    setModalEvent(evt);
-  };
+      if (evRes.data)    setEvents(evRes.data as DBEvent[]);
+      if (stRes.data)    setStaff(stRes.data as DBStaff[]);
+      if (avRes.data)    setAvailData(avRes.data as DBAvailability[]);
+      if (paRes.data)    setPayroll(paRes.data as DBPayroll[]);
+      if (notifRes.data) setNotifCount(notifRes.data.length);
+      if (actRes.data)   setActivity(actRes.data as DBActivity[]);
+    } catch (e) {
+      console.warn('[Dashboard] fetchAll error:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const filteredStaff = useMemo(() => {
-    if (!selectedEventId) return staff;
-    return staff.filter(s => s.current_event_id === selectedEventId || s.status === 'available')
-                .sort((a, b) => (a.current_event_id === selectedEventId ? -1 : 1));
-  }, [selectedEventId, staff]);
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
 
+  /* Realtime subscriptions */
+  useEffect(() => {
+    ['hub_events', 'hub_avail', 'hub_activity', 'hub_payroll'].forEach(t =>
+      supabase.getChannels()
+        .filter(c => c.topic === `realtime:${t}`)
+        .forEach(c => supabase.removeChannel(c)),
+    );
+
+    const sub = supabase
+      .channel('hub')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' },             fetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_availability' }, fetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'availability_events' }, fetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payroll' },            fetchAll)
+      .subscribe();
+
+    return () => { supabase.removeChannel(sub); };
+  }, [fetchAll]);
+
+  /* Toggle availability */
+  const handleToggleAvailability = useCallback(async (
+    staffId : string,
+    date    : string,
+    current : boolean | undefined,
+  ) => {
+    const newVal = current === true ? false : true;
+    if (current === undefined) {
+      await supabase.from('staff_availability').insert({ staff_id: staffId, date, is_available: newVal });
+    } else {
+      await supabase
+        .from('staff_availability')
+        .update({ is_available: newVal })
+        .eq('staff_id', staffId)
+        .eq('date', date);
+    }
+    fetchAll();
+  }, [fetchAll]);
+
+  const handleEventPress = useCallback((id: string) => {
+    router.push(`/(organizer)/event/${id}` as any);
+  }, [router]);
+
+  /* ────────────────────────────────────────────────────────────────────────── */
   return (
     <View style={{ flex: 1, backgroundColor: BG }}>
-      <StatusBar style="light"/>
+      <StatusBar style="light" />
+      <ParticleBg />
 
-      {/* Header */}
-      <View style={{ paddingTop: insets.top + 20, paddingHorizontal: EDGE, paddingBottom: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <View>
-          <Text style={{ color: WHITE, fontSize: 30, fontWeight: '900', letterSpacing: -1 }}>Eventure Hub</Text>
-          <Text style={{ color: BLUE, fontSize: 14, marginTop: 4, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>{events.length} Projets Actifs</Text>
+      {/* Fixed header */}
+      <AppHeader
+        title="PUT.IN COFFEE"
+        subtitle="Sanur · Bali · Hub"
+        notifCount={notifCount}
+        onBell={() => setShowNotifs(true)}
+      />
+
+      {loading ? (
+        <View style={styles.loader}>
+          <ActivityIndicator color={WHITE} size="large" />
         </View>
-        <TouchableOpacity style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
-          <Ionicons name="options" size={22} color={WHITE} />
-        </TouchableOpacity>
-      </View>
+      ) : (
+        <ScrollView
+          style={{ flex: 1, backgroundColor: BG }}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 120, paddingTop: 20 }}
+        >
+          {/* Section 1: Staff Status */}
+          <StaffStatusSection staff={staff} availData={availData} />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
-        
-        {/* Carrousel Événements (La pièce maîtresse) */}
-        <View style={{ marginBottom: 40 }}>
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: EDGE, paddingVertical: 10 }}
-            snapToInterval={CARD_WIDTH + 20}
-            decelerationRate="fast"
-            data={events}
-            keyExtractor={item => item.id}
-            renderItem={({ item }) => (
-              <EventCard 
-                evt={item} 
-                isActive={selectedEventId === item.id} 
-                onPress={() => handleEventPress(item)} 
-              />
-            )}
+          {/* Section 2: Events this week */}
+          <EventListSection
+            events={events}
+            staff={staff}
+            onPress={handleEventPress}
           />
-        </View>
 
-        {/* Section Staff Roster filtré */}
-        <View style={{ paddingHorizontal: EDGE }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 20 }}>
-            <View style={{ gap: 4 }}>
-              <Text style={{ color: WHITE, fontSize: 22, fontWeight: '900' }}>
-                {selectedEventId ? 'Équipe Mobilisable' : 'Équipe Globale'}
-              </Text>
-              <Text style={{ color: MUTED, fontSize: 13, fontWeight: '500' }}>
-                {filteredStaff.length} membres correspondent aux critères
-              </Text>
-            </View>
-            {selectedEventId && (
-              <TouchableOpacity onPress={() => setSelectedEventId(null)} style={{ paddingVertical: 6, paddingHorizontal: 12, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 20 }}>
-                <Text style={{ color: WHITE, fontSize: 12, fontWeight: '700' }}>Voir tout</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            data={filteredStaff}
-            keyExtractor={item => item.id}
-            renderItem={({ item }) => <StaffCard member={item} />}
-            contentContainerStyle={{ paddingBottom: 20 }}
+          {/* Section 3: 7-day availability grid */}
+          <AvailabilityGridSection
+            staff={staff}
+            availData={availData}
+            onToggle={handleToggleAvailability}
           />
-        </View>
-      </ScrollView>
 
-      {/* Modal Détail Événement */}
-      <EventDetailModal 
-        visible={!!modalEvent} 
-        evt={modalEvent} 
-        onClose={() => setModalEvent(null)} 
-        staff={staff} 
+          {/* Section 4: Payroll */}
+          <PayrollSection
+            payroll={payroll}
+            onNavigate={() => router.push('/(organizer)/payroll' as any)}
+          />
+
+          {/* Section 5: Activity feed */}
+          <ActivitySection activity={activity} />
+
+          {/* Section 6: Quick actions */}
+          <QuickActionsSection
+            onWA={() => setWaVisible(true)}
+            onEvent={() => router.push('/(organizer)/create-event' as any)}
+            onPayroll={() => router.push('/(organizer)/payroll' as any)}
+            onNotifs={() => setShowNotifs(true)}
+          />
+        </ScrollView>
+      )}
+
+      {/* WhatsApp Modal */}
+      <WAModal
+        visible={waVisible}
+        staff={staff}
+        onClose={() => setWaVisible(false)}
       />
     </View>
   );
 }
+
+/* ─── Styles ─────────────────────────────────────────────────────────────────── */
+const styles = StyleSheet.create({
+  loader: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  /* Sections */
+  section: {
+    marginBottom: 32,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: EDGE,
+    marginBottom: 14,
+  },
+  sectionTitle: {
+    color: WHITE,
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+
+  /* Glass card */
+  glassCard: {
+    backgroundColor: GLASS,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 20,
+    overflow: 'hidden',
+    padding: 16,
+  },
+
+  /* Week pill */
+  weekPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    backgroundColor: GLASS,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  weekPillText: {
+    color: WHITE,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
+  /* Empty states */
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 28,
+    gap: 8,
+  },
+  emptyText: {
+    color: DIM,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+
+  /* Staff row */
+  staffRow: {
+    flexDirection: 'row',
+    paddingHorizontal: EDGE,
+    gap: 12,
+  },
+  staffCard: {
+    flex: 1,
+    backgroundColor: GLASS,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 18,
+    padding: 14,
+    alignItems: 'center',
+    gap: 6,
+  },
+  staffName: {
+    color: WHITE,
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  staffAvailLabel: {
+    color: DIM,
+    fontSize: 10,
+    fontWeight: '500',
+  },
+
+  /* Event cards */
+  eventCard: {
+    backgroundColor: GLASS,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 18,
+    padding: 16,
+  },
+  eventCardTitle: {
+    color: WHITE,
+    fontSize: 16,
+    fontWeight: '800',
+    lineHeight: 20,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  typePill: {
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  typePillText: {
+    color: WHITE,
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'capitalize',
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  metaText: {
+    color: WHITE,
+    fontSize: 11,
+    fontWeight: '500',
+  },
+
+  /* Grid */
+  gridCell: {
+    width: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gridDayLabel: {
+    color: DIM,
+    fontSize: 8,
+    fontWeight: '700',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+  },
+
+  /* Payroll */
+  payrollWeekRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  payrollWeekText: {
+    color: DIM,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  payrollRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  payrollName: {
+    flex: 1,
+    color: WHITE,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  payrollHours: {
+    color: DIM,
+    fontSize: 12,
+    fontWeight: '600',
+    width: 36,
+    textAlign: 'right',
+  },
+  payrollAmount: {
+    color: WHITE,
+    fontSize: 13,
+    fontWeight: '800',
+    width: 48,
+    textAlign: 'right',
+  },
+  payrollStatus: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  payrollStatusText: {
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  payrollFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.07)',
+  },
+  payrollDetailsLink: {
+    color: WHITE,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  payrollTotal: {
+    color: WHITE,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+
+  /* Activity */
+  activityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  activityName: {
+    color: WHITE,
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  activityDate: {
+    color: DIM,
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  activityTime: {
+    color: DIM,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+
+  /* Quick actions */
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: EDGE,
+    gap: 12,
+  },
+  actionBtn: {
+    width: (SW - EDGE * 2 - 12) / 2,
+    backgroundColor: GLASS,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 18,
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  actionLabel: {
+    color: WHITE,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  /* WhatsApp Modal */
+  modal: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: NAVY,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: BORDER,
+    overflow: 'hidden',
+    paddingBottom: 40,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.20)',
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 20,
+  },
+  modalTitle: {
+    color: WHITE,
+    fontSize: 18,
+    fontWeight: '800',
+    paddingHorizontal: EDGE,
+    marginBottom: 16,
+    letterSpacing: -0.3,
+  },
+  modalLabel: {
+    color: DIM,
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+
+  /* Staff / type chips */
+  staffChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: GLASS,
+  },
+  staffChipActive: {
+    backgroundColor: WHITE,
+    borderColor: WHITE,
+  },
+  staffChipText: {
+    color: WHITE,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  typeChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: GLASS,
+  },
+  typeChipActive: {
+    backgroundColor: WHITE,
+    borderColor: WHITE,
+  },
+  typeChipText: {
+    color: WHITE,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
+  /* Message input */
+  msgInput: {
+    backgroundColor: GLASS,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 14,
+    padding: 12,
+    color: WHITE,
+    fontSize: 13,
+    fontWeight: '500',
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+
+  /* Feedback */
+  feedbackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: EDGE,
+    marginBottom: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  feedbackText: {
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
+  },
+
+  /* Send / Cancel buttons */
+  sendBtn: {
+    backgroundColor: WHITE,
+    borderRadius: 16,
+    paddingVertical: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  sendBtnText: {
+    color: BG,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  cancelBtn: {
+    borderRadius: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: BORDER,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: GLASS,
+  },
+  cancelBtnText: {
+    color: WHITE,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+});

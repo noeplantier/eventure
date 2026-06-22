@@ -1,7 +1,7 @@
 /**
  * app/(organizer)/event/[id].tsx — EVENTURE v3
  * Production-quality event detail page.
- * Design: #050E1B bg, #1A9FE3 blue accent, Apple Liquid Glass cards.
+ * Design: #0F172A bg, #6366F1 indigo accent, Apple Liquid Glass cards.
  */
 
 import React, {
@@ -31,30 +31,30 @@ const RNMaps       = Platform.OS !== 'web' ? require('react-native-maps') : null
 const MapView: any = RNMaps?.default ?? View;
 const Marker: any  = RNMaps?.Marker  ?? (() => null);
 
-/* ─── Design tokens ──────────────────────────────────────────────────────── */
-const BG    = '#050E1B';
-const BLUE  = '#1A9FE3';
+/* ─── Design tokens — navy + white ONLY ─────────────────────────────────── */
+const BG    = '#020818';
+const BLUE  = '#FFFFFF';
 const WHITE = '#FFFFFF';
-const MUTED = 'rgba(255,255,255,0.55)';
+const MUTED = 'rgba(255,255,255,0.45)';
 const FAINT = 'rgba(255,255,255,0.06)';
 const EDGE  = 18;
 
 /* ─── Status config ──────────────────────────────────────────────────────── */
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  published : { label: 'PUBLIÉ',    color: WHITE,                    bg: 'rgba(26,159,227,0.18)' },
-  draft     : { label: 'BROUILLON', color: 'rgba(255,255,255,0.55)', bg: 'rgba(255,255,255,0.07)' },
-  ongoing   : { label: 'EN COURS',  color: BLUE,                     bg: 'rgba(26,159,227,0.15)' },
-  completed : { label: 'TERMINÉ',   color: 'rgba(255,255,255,0.60)', bg: 'rgba(255,255,255,0.08)' },
-  cancelled : { label: 'ANNULÉ',    color: 'rgba(255,255,255,0.35)', bg: 'rgba(255,255,255,0.05)' },
+  published : { label: 'PUBLIÉ',    color: WHITE, bg: 'rgba(255,255,255,0.15)' },
+  draft     : { label: 'BROUILLON', color: WHITE, bg: 'rgba(255,255,255,0.07)' },
+  ongoing   : { label: 'EN COURS',  color: WHITE, bg: 'rgba(255,255,255,0.12)' },
+  completed : { label: 'TERMINÉ',   color: WHITE, bg: 'rgba(255,255,255,0.08)' },
+  cancelled : { label: 'ANNULÉ',    color: WHITE, bg: 'rgba(255,255,255,0.05)' },
 };
 
 /* ─── Mission status config ──────────────────────────────────────────────── */
 const MISSION_STATUS: Record<string, { label: string; color: string; bg: string }> = {
-  pending     : { label: 'en attente',  color: 'rgba(255,255,255,0.55)', bg: 'rgba(255,255,255,0.07)' },
-  confirmed   : { label: 'confirmée',   color: BLUE,                     bg: 'rgba(26,159,227,0.15)' },
-  in_progress : { label: 'en cours',    color: WHITE,                    bg: 'rgba(26,159,227,0.20)' },
-  completed   : { label: 'terminée',    color: 'rgba(255,255,255,0.55)', bg: 'rgba(255,255,255,0.08)' },
-  cancelled   : { label: 'annulée',     color: 'rgba(255,255,255,0.30)', bg: 'rgba(255,255,255,0.04)' },
+  pending     : { label: 'en attente',  color: WHITE, bg: 'rgba(255,255,255,0.07)' },
+  confirmed   : { label: 'confirmée',   color: WHITE, bg: 'rgba(255,255,255,0.12)' },
+  in_progress : { label: 'en cours',    color: WHITE, bg: 'rgba(255,255,255,0.15)' },
+  completed   : { label: 'terminée',    color: '#FFFFFF', bg: 'rgba(255,255,255,0.08)' },
+  cancelled   : { label: 'annulée',     color: '#FFFFFF', bg: 'rgba(255,255,255,0.04)' },
 };
 
 /* ─── Type icons ─────────────────────────────────────────────────────────── */
@@ -71,10 +71,10 @@ const TYPE_ICONS: Record<string, React.ComponentProps<typeof Ionicons>['name']> 
 const mapStyle = [
   { elementType: 'geometry',         stylers: [{ color: '#0A1628' }] },
   { elementType: 'labels.text.fill', stylers: [{ color: '#8BAFC9' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#050E1B' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#0F172A' }] },
   { featureType: 'road',  elementType: 'geometry',        stylers: [{ color: '#0C2A4A' }] },
   { featureType: 'road',  elementType: 'geometry.stroke', stylers: [{ color: '#0A1628' }] },
-  { featureType: 'water', elementType: 'geometry',        stylers: [{ color: '#050E1B' }] },
+  { featureType: 'water', elementType: 'geometry',        stylers: [{ color: '#0F172A' }] },
   { featureType: 'poi',   stylers: [{ visibility: 'off' }] },
   { featureType: 'transit', stylers: [{ visibility: 'off' }] },
 ];
@@ -689,7 +689,7 @@ export default function EventDetailScreen() {
         >
           <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
           <LinearGradient
-            colors={['rgba(26,159,227,0.25)', 'rgba(26,159,227,0.10)']}
+            colors={['rgba(255,255,255,0.10)', 'rgba(255,255,255,0.03)']}
             style={StyleSheet.absoluteFill}
           />
           <Ionicons name="create-outline" size={20} color={WHITE} style={{ marginRight: 10 }} />
@@ -796,7 +796,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: `rgba(26,159,227,0.30)`,
+    borderColor: `rgba(255,255,255,0.15)`,
   },
   typeChipText: {
     color: WHITE,
@@ -834,12 +834,12 @@ const styles = StyleSheet.create({
   },
   countBadge: {
     marginLeft: 8,
-    backgroundColor: 'rgba(26,159,227,0.20)',
+    backgroundColor: 'rgba(255,255,255,0.10)',
     borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderWidth: 1,
-    borderColor: 'rgba(26,159,227,0.30)',
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   countBadgeText: {
     color: BLUE,
@@ -877,7 +877,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   cardLabel: {
-    color: MUTED,
+    color: WHITE,
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.5,
@@ -890,7 +890,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   cardValueSm: {
-    color: MUTED,
+    color: WHITE,
     fontSize: 12,
     marginLeft: 4,
   },
@@ -914,7 +914,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   budgetSub: {
-    color: MUTED,
+    color: WHITE,
     fontSize: 11,
     marginTop: 2,
   },
@@ -923,7 +923,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   payLabel: {
-    color: MUTED,
+    color: WHITE,
     fontSize: 11,
   },
   payValue: {
@@ -948,7 +948,7 @@ const styles = StyleSheet.create({
 
   /* ── description ── */
   descriptionText: {
-    color: 'rgba(255,255,255,0.75)',
+    color: '#FFFFFF',
     fontSize: 14,
     lineHeight: 22,
   },
@@ -974,9 +974,9 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(26,159,227,0.18)',
+    backgroundColor: 'rgba(255,255,255,0.10)',
     borderWidth: 1,
-    borderColor: 'rgba(26,159,227,0.35)',
+    borderColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -997,7 +997,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   staffDate: {
-    color: MUTED,
+    color: WHITE,
     fontSize: 11,
   },
   staffAmount: {
@@ -1061,7 +1061,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   slotLabel: {
-    color: MUTED,
+    color: WHITE,
     fontSize: 11,
     marginTop: 6,
   },
@@ -1089,7 +1089,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(26,159,227,0.35)',
+    borderColor: 'rgba(255,255,255,0.18)',
   },
   actionBtnText: {
     color: WHITE,
@@ -1112,7 +1112,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   errorSub: {
-    color: MUTED,
+    color: WHITE,
     fontSize: 13,
     textAlign: 'center',
   },
@@ -1131,7 +1131,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   emptyText: {
-    color: MUTED,
+    color: WHITE,
     fontSize: 13,
   },
 });

@@ -20,16 +20,15 @@ import { getWorkingOrganizerId }   from '../../lib/mockUser';
 import { useInteractiveBg } from '../../components/InteractiveBg';
 
 /* ─── Design tokens ──────────────────────────────────────────────────────── */
-const BG       = '#050E1B';
-const BLUE     = '#1A9FE3';
-const CYAN     = '#1A9FE3';
-const GOLD     = '#FFFFFF';
-const NAVY     = '#0C1A30';
-const WHITE    = '#FFFFFF';
-const MUTED    = 'rgba(255,255,255,0.55)';
-const FAINT    = 'rgba(255,255,255,0.08)';
-const RED      = 'rgba(255,255,255,0.45)';
-const GREEN_OK = '#1A9FE3';
+const BG    = '#020818';
+const BLUE  = '#FFFFFF';
+const GOLD  = '#FFFFFF';
+const NAVY  = 'rgba(255,255,255,0.05)';
+const WHITE = '#FFFFFF';
+const MUTED = 'rgba(255,255,255,0.40)';
+const FAINT = 'rgba(255,255,255,0.08)';
+const RED   = 'rgba(255,255,255,0.35)';
+const GREEN_OK = '#FFFFFF';
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 type MissionStatus = 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
@@ -72,20 +71,15 @@ interface Section {
 
 /* ─── Status config ──────────────────────────────────────────────────────── */
 const STATUS_CONFIG: Record<MissionStatus, { label: string; color: string; bg: string; icon: string }> = {
-  pending    : { label: 'En attente',  color: 'rgba(255,255,255,0.55)', bg: 'rgba(255,255,255,0.07)', icon: 'time-outline' },
-  confirmed  : { label: 'Confirmée',   color: '#1A9FE3',                bg: 'rgba(255,255,255,0.05)',  icon: 'checkmark-circle-outline' },
+  pending    : { label: 'En attente',  color: '#FFFFFF', bg: 'rgba(255,255,255,0.07)', icon: 'time-outline' },
+  confirmed  : { label: 'Confirmée',   color: '#FFFFFF',                bg: 'rgba(255,255,255,0.05)',  icon: 'checkmark-circle-outline' },
   in_progress: { label: 'En cours',    color: '#FFFFFF',                bg: 'rgba(255,255,255,0.09)',  icon: 'flash-outline' },
-  completed  : { label: 'Terminée',    color: 'rgba(255,255,255,0.70)', bg: 'rgba(255,255,255,0.04)',  icon: 'checkmark-done-outline' },
-  cancelled  : { label: 'Annulée',     color: 'rgba(255,255,255,0.35)', bg: 'rgba(255,255,255,0.05)', icon: 'close-circle-outline' },
+  completed  : { label: 'Terminée',    color: '#FFFFFF', bg: 'rgba(255,255,255,0.04)',  icon: 'checkmark-done-outline' },
+  cancelled  : { label: 'Annulée',     color: '#FFFFFF', bg: 'rgba(255,255,255,0.05)', icon: 'close-circle-outline' },
 };
 
-/* ─── Event type colors ──────────────────────────────────────────────────── */
-const TYPE_COLOR: Record<string, string> = {
-  Gala: GOLD, Festival: BLUE, 'Conférence': CYAN,
-  Mariage: BLUE, 'Séminaire': '#1A9FE3', 'Soirée': GOLD,
-  Concert: RED, Sport: BLUE,
-};
-const typeColor = (t: string | null | undefined) => TYPE_COLOR[t ?? ''] ?? BLUE;
+/* ─── Event type colors — white only ─────────────────────────────────────── */
+const typeColor = (_t: string | null | undefined) => 'rgba(255,255,255,0.70)';
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 const fmtDate = (iso: string | null | undefined) =>
@@ -105,8 +99,9 @@ const fmtMoney = (n: number | null | undefined) =>
 /* ─── Enhanced particles ─── */
 const _NUM_P = 32;
 const _PCOLS = [
-  '#1A9FE3','rgba(26,159,227,0.55)','#1A9FE3','rgba(26,159,227,0.40)',
-  'rgba(255,255,255,0.28)','rgba(255,255,255,0.16)','rgba(255,255,255,0.07)',
+  'rgba(255,255,255,0.55)','rgba(255,255,255,0.35)','rgba(255,255,255,0.20)',
+  'rgba(255,255,255,0.28)','rgba(255,255,255,0.16)','rgba(255,255,255,0.10)',
+  'rgba(255,255,255,0.07)',
 ];
 const _PARTS = Array.from({ length: _NUM_P }, (_, i) => ({
   x:   (Math.sin(i * 2.39996) * 0.5 + 0.5) * 100,
@@ -132,7 +127,7 @@ function ParticleBg() {
   }, []);
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <LinearGradient colors={['#050E1B','#091628','#05112A','#050E1B']} locations={[0,0.3,0.7,1]} style={StyleSheet.absoluteFill}/>
+      <LinearGradient colors={['#010610','#020818','#030B1E','#041232','#020818','#010610']} locations={[0,0.2,0.4,0.6,0.8,1]} style={StyleSheet.absoluteFill}/>
       <View style={{position:'absolute',top:'6%',left:'-25%',right:'-25%',height:'50%',backgroundColor:'rgba(255,255,255,0.02)',borderRadius:999}}/>
       {_PARTS.map((p, i) => {
         const opacity = anims[i].interpolate({ inputRange:[0,1], outputRange:[0.10, p.glow ? 0.80 : 0.52] });
@@ -155,7 +150,8 @@ function Avatar({ name, size = 36 }: { name: string; size?: number }) {
   return (
     <View style={{
       width: size, height: size, borderRadius: size / 2,
-      backgroundColor: BLUE, alignItems: 'center', justifyContent: 'center',
+      backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center',
+      borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
     }}>
       <Text style={{ color: WHITE, fontSize: size * 0.36, fontWeight: '700' }}>{initials}</Text>
     </View>
@@ -264,10 +260,11 @@ function MissionCard({ mission: m, onCheckIn, onCheckOut, onPay }: MissionCardPr
             {staffName}
           </Text>
           <View style={{
-            alignSelf: 'flex-start', backgroundColor: `${BLUE}18`,
+            alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.10)',
             paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6,
+            borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.20)',
           }}>
-            <Text style={{ color: BLUE, fontSize: 11, fontWeight: '700' }}>{m.role || '—'}</Text>
+            <Text style={{ color: WHITE, fontSize: 11, fontWeight: '700' }}>{m.role || '—'}</Text>
           </View>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: cfg.bg, borderColor: `${cfg.color}30`, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
@@ -282,14 +279,14 @@ function MissionCard({ mission: m, onCheckIn, onCheckOut, onPay }: MissionCardPr
       {/* Timeline row */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
         <Ionicons name="time-outline" size={12} color={MUTED}/>
-        <Text style={{ color: MUTED, fontSize: 12 }}>
+        <Text style={{ color: WHITE, fontSize: 12 }}>
           {fmtDate(m.date_start)}
         </Text>
-        <Text style={{ color: MUTED, fontSize: 12 }}>
+        <Text style={{ color: WHITE, fontSize: 12 }}>
           {fmtTime(m.date_start)}
         </Text>
         <Ionicons name="arrow-forward-outline" size={10} color={MUTED}/>
-        <Text style={{ color: MUTED, fontSize: 12 }}>
+        <Text style={{ color: WHITE, fontSize: 12 }}>
           {fmtTime(m.date_end)}
         </Text>
       </View>
@@ -299,16 +296,16 @@ function MissionCard({ mission: m, onCheckIn, onCheckOut, onPay }: MissionCardPr
         <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap' }}>
           {m.check_in_time ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <Ionicons name="log-in-outline" size={12} color={BLUE}/>
-              <Text style={{ color: BLUE, fontSize: 11 }}>Arrivée</Text>
-              <Text style={{ color: BLUE, fontSize: 11, fontWeight: '700' }}>{fmtTime(m.check_in_time)}</Text>
+              <Ionicons name="log-in-outline" size={12} color={WHITE}/>
+              <Text style={{ color: WHITE, fontSize: 11 }}>Arrivée</Text>
+              <Text style={{ color: WHITE, fontSize: 11, fontWeight: '700' }}>{fmtTime(m.check_in_time)}</Text>
             </View>
           ) : null}
           {m.check_out_time ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <Ionicons name="log-out-outline" size={12} color={GOLD}/>
-              <Text style={{ color: GOLD, fontSize: 11 }}>Départ</Text>
-              <Text style={{ color: GOLD, fontSize: 11, fontWeight: '700' }}>{fmtTime(m.check_out_time)}</Text>
+              <Ionicons name="log-out-outline" size={12} color={MUTED}/>
+              <Text style={{ color: MUTED, fontSize: 11 }}>Départ</Text>
+              <Text style={{ color: WHITE, fontSize: 11, fontWeight: '700' }}>{fmtTime(m.check_out_time)}</Text>
             </View>
           ) : null}
         </View>
@@ -318,7 +315,7 @@ function MissionCard({ mission: m, onCheckIn, onCheckOut, onPay }: MissionCardPr
       <View style={{ gap: 6 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <Ionicons name="cash-outline" size={12} color={MUTED}/>
-          <Text style={{ color: MUTED, fontSize: 12 }}>
+          <Text style={{ color: WHITE, fontSize: 12 }}>
             {m.hours_worked != null ? m.hours_worked.toFixed(1) : '—'} h
             {' × '}
             {m.hourly_rate != null ? `${m.hourly_rate} €/h` : '—'}
@@ -329,10 +326,10 @@ function MissionCard({ mission: m, onCheckIn, onCheckOut, onPay }: MissionCardPr
         {due > 0 && (
           <View style={{ gap: 4 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={{ color: MUTED, fontSize: 11 }}>
+              <Text style={{ color: WHITE, fontSize: 11 }}>
                 Payé : {fmtMoney(paid)} / {fmtMoney(due)}
               </Text>
-              <Text style={{ color: paidPct >= 1 ? GREEN_OK : BLUE, fontSize: 11, fontWeight: '700' }}>
+              <Text style={{ color: WHITE, fontSize: 11, fontWeight: '700' }}>
                 {Math.round(paidPct * 100)} %
               </Text>
             </View>
@@ -347,32 +344,32 @@ function MissionCard({ mission: m, onCheckIn, onCheckOut, onPay }: MissionCardPr
         <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
           {m.status === 'confirmed' && (
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: `${BLUE}40`, flexDirection: 'row', alignItems: 'center', gap: 5 }]}
+              style={[styles.actionBtn, { backgroundColor: 'rgba(255,255,255,0.10)', borderColor: 'rgba(255,255,255,0.22)', flexDirection: 'row', alignItems: 'center', gap: 5 }]}
               onPress={() => onCheckIn(m.id)}
               activeOpacity={0.78}
             >
-              <Ionicons name="log-in-outline" size={13} color={BLUE}/>
-              <Text style={{ color: BLUE, fontSize: 12, fontWeight: '800' }}>Check-in</Text>
+              <Ionicons name="log-in-outline" size={13} color={WHITE}/>
+              <Text style={{ color: WHITE, fontSize: 12, fontWeight: '800' }}>Check-in</Text>
             </TouchableOpacity>
           )}
           {m.status === 'in_progress' && (
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: `${GOLD}40`, flexDirection: 'row', alignItems: 'center', gap: 5 }]}
+              style={[styles.actionBtn, { backgroundColor: 'rgba(255,255,255,0.10)', borderColor: 'rgba(255,255,255,0.22)', flexDirection: 'row', alignItems: 'center', gap: 5 }]}
               onPress={() => onCheckOut(m.id, m.check_in_time ?? new Date().toISOString(), m.hourly_rate)}
               activeOpacity={0.78}
             >
-              <Ionicons name="log-out-outline" size={13} color={GOLD}/>
-              <Text style={{ color: GOLD, fontSize: 12, fontWeight: '800' }}>Check-out</Text>
+              <Ionicons name="log-out-outline" size={13} color={WHITE}/>
+              <Text style={{ color: WHITE, fontSize: 12, fontWeight: '800' }}>Check-out</Text>
             </TouchableOpacity>
           )}
           {m.status === 'completed' && paid < due && (
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: `${BLUE}40`, flexDirection: 'row', alignItems: 'center', gap: 5 }]}
+              style={[styles.actionBtn, { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', gap: 5 }]}
               onPress={() => onPay(m.id, due)}
               activeOpacity={0.78}
             >
-              <Ionicons name="card-outline" size={13} color={BLUE}/>
-              <Text style={{ color: BLUE, fontSize: 12, fontWeight: '800' }}>Marquer payé</Text>
+              <Ionicons name="card-outline" size={13} color="#020818"/>
+              <Text style={{ color: '#020818', fontSize: 12, fontWeight: '800' }}>Marquer payé</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -403,7 +400,7 @@ function EventSectionHeader({ event }: { event: EventRow | undefined }) {
         <Text style={{ color: WHITE, fontSize: 15, fontWeight: '800', letterSpacing: -0.2 }} numberOfLines={1}>
           {event.title}
         </Text>
-        <Text style={{ color: MUTED, fontSize: 12, marginTop: 2 }}>
+        <Text style={{ color: WHITE, fontSize: 12, marginTop: 2 }}>
           {fmtDate(event.date_start)}
         </Text>
       </View>
@@ -436,7 +433,7 @@ function KpiChip({ icon, label, value, color, pulse }: KpiChipProps) {
         <Ionicons name={icon as any} size={14} color={color}/>
       </View>
       <Text style={{ color, fontSize: 18, fontWeight: '900', letterSpacing: -0.5 }}>{value}</Text>
-      <Text style={{ color: MUTED, fontSize: 10, fontWeight: '600', textAlign: 'center', marginTop: 2 }}>
+      <Text style={{ color: WHITE, fontSize: 10, fontWeight: '600', textAlign: 'center', marginTop: 2 }}>
         {label}
       </Text>
     </View>
@@ -658,19 +655,19 @@ export default function MissionsScreen() {
       {/* Page title */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <View style={{ gap: 2 }}>
-          <Text style={{ color: MUTED, fontSize: 12, fontWeight: '600' }}>Gestion des</Text>
+          <Text style={{ color: WHITE, fontSize: 12, fontWeight: '600' }}>Gestion des</Text>
           <Text style={{ color: WHITE, fontSize: 26, fontWeight: '900', letterSpacing: -0.6 }}>Missions</Text>
         </View>
         <TouchableOpacity
           style={{
             width: 40, height: 40, borderRadius: 13,
             backgroundColor: FAINT, borderWidth: StyleSheet.hairlineWidth,
-            borderColor: `${BLUE}25`, alignItems: 'center', justifyContent: 'center',
+            borderColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center',
           }}
           onPress={() => router.push('/(organizer)/applications' as any)}
           activeOpacity={0.78}
         >
-          <Ionicons name="document-text-outline" size={18} color={BLUE}/>
+          <Ionicons name="document-text-outline" size={18} color={WHITE}/>
         </TouchableOpacity>
       </View>
 
@@ -719,14 +716,14 @@ export default function MissionsScreen() {
       <View style={{ alignItems: 'center', paddingTop: 60, gap: 14 }}>
         <View style={{
           width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.05)',
-          alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: `${BLUE}30`,
+          alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
         }}>
-          <Ionicons name="flash-outline" size={36} color={BLUE}/>
+          <Ionicons name="flash-outline" size={36} color={WHITE}/>
         </View>
         <Text style={{ color: WHITE, fontSize: 17, fontWeight: '900', letterSpacing: -0.3 }}>
           Aucune mission
         </Text>
-        <Text style={{ color: MUTED, fontSize: 13, textAlign: 'center', lineHeight: 20 }}>
+        <Text style={{ color: WHITE, fontSize: 13, textAlign: 'center', lineHeight: 20 }}>
           {activeTab === 'all'
             ? 'Créez un événement et affectez du staff\npour générer vos premières missions.'
             : 'Aucune mission ne correspond à ce filtre.'}
@@ -735,13 +732,12 @@ export default function MissionsScreen() {
           <TouchableOpacity
             style={{
               paddingHorizontal: 22, paddingVertical: 12, borderRadius: 14,
-              backgroundColor: BLUE, shadowColor: BLUE,
-              shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 10, elevation: 5,
+              backgroundColor: '#FFFFFF',
             }}
             onPress={() => router.push('/(organizer)/create-event' as any)}
             activeOpacity={0.82}
           >
-            <Text style={{ color: BG, fontWeight: '800', fontSize: 13 }}>+ Créer un événement</Text>
+            <Text style={{ color: '#020818', fontWeight: '800', fontSize: 13 }}>+ Créer un événement</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -760,7 +756,7 @@ export default function MissionsScreen() {
         renderItem={renderItem}
         renderSectionHeader={renderSectionHeader}
         stickySectionHeadersEnabled={false}
-        contentContainerStyle={{backgroundColor:'#050E1B',flexGrow:1,
+        contentContainerStyle={{backgroundColor:'#020818',flexGrow:1,
           paddingTop: insets.top + 12,
           paddingBottom: insets.bottom + 120,
           paddingHorizontal: 16,
@@ -771,7 +767,7 @@ export default function MissionsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => { setRefreshing(true); load(true); }}
-            tintColor={BLUE}
+            tintColor={WHITE}
           />
         }
         showsVerticalScrollIndicator={false}
@@ -803,21 +799,21 @@ function FilterTabsRow({ tabs, activeTab, tabCounts, onPress }: FilterTabsRowPro
             style={[
               styles.filterTab,
               isActive
-                ? { backgroundColor: 'rgba(26,159,227,0.14)', borderColor: `${BLUE}60` }
+                ? { backgroundColor: 'rgba(255,255,255,0.15)', borderColor: 'rgba(255,255,255,0.40)' }
                 : { backgroundColor: FAINT, borderColor: 'transparent' },
             ]}
             onPress={() => onPress(tab.key)}
             activeOpacity={0.75}
           >
-            <Text style={[styles.filterTabText, isActive && { color: BLUE, fontWeight: '800' }]}>
+            <Text style={[styles.filterTabText, isActive && { color: WHITE, fontWeight: '800' }]}>
               {tab.label}
             </Text>
             {count > 0 && (
               <View style={{
-                backgroundColor: isActive ? `${BLUE}25` : `${MUTED}30`,
+                backgroundColor: isActive ? 'rgba(255,255,255,0.20)' : 'rgba(255,255,255,0.08)',
                 borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1, marginLeft: 4,
               }}>
-                <Text style={{ color: isActive ? BLUE : MUTED, fontSize: 10, fontWeight: '700' }}>
+                <Text style={{ color: WHITE, fontSize: 10, fontWeight: '700' }}>
                   {count}
                 </Text>
               </View>
@@ -827,7 +823,7 @@ function FilterTabsRow({ tabs, activeTab, tabCounts, onPress }: FilterTabsRowPro
       }}
       renderSectionHeader={() => null}
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{backgroundColor:'#050E1B',flexGrow:1, gap: 8, paddingBottom: 2 }}
+      contentContainerStyle={{backgroundColor:'#020818',flexGrow:1, gap: 8, paddingBottom: 2 }}
     />
   );
 }
@@ -886,7 +882,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   filterTabText: {
-    color: MUTED,
+    color: WHITE,
     fontSize: 12,
     fontWeight: '600',
   },

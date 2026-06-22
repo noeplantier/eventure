@@ -13,18 +13,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 const { width: W, height: H } = Dimensions.get('window');
 
-const BG   = '#050E1B';
-const BLUE = '#1A9FE3';
+const BG   = '#020818';
+const RIPPLE = 'rgba(255,255,255,0.18)';
 
 /* ── Pre-computed ultra-fine particles (deterministic) ─────────────────── */
 const N = 65;
 const PCOLS = [
-  'rgba(26,159,227,0.55)',
-  'rgba(26,159,227,0.30)',
-  'rgba(26,159,227,0.15)',
+  'rgba(255,255,255,0.50)',
+  'rgba(255,255,255,0.28)',
+  'rgba(255,255,255,0.16)',
   'rgba(255,255,255,0.18)',
   'rgba(255,255,255,0.10)',
-  'rgba(26,159,227,0.08)',
+  'rgba(255,255,255,0.08)',
   'rgba(255,255,255,0.06)',
 ];
 
@@ -69,7 +69,7 @@ function RippleView({ x, y, onDone }: Ripple & { onDone: () => void }) {
         left: x - 30, top: y - 30,
         width: 60, height: 60,
         borderRadius: 30,
-        backgroundColor: BLUE,
+        backgroundColor: RIPPLE,
         opacity,
         transform: [{ scale }],
       }}
@@ -98,16 +98,16 @@ function ParticleLayer() {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <LinearGradient
-        colors={[BG, '#071325', '#050F20', BG]}
-        locations={[0, 0.35, 0.65, 1]}
+        colors={['#010610', '#020818', '#030B1E', '#041232', '#020818', '#010610']}
+        locations={[0, 0.2, 0.4, 0.6, 0.8, 1]}
         style={StyleSheet.absoluteFill}
       />
-      {/* Subtle central halo */}
+      {/* Subtle central halo — pure navy white glow */}
       <View style={{
         position: 'absolute',
         top: H * 0.1, left: -W * 0.2, right: -W * 0.2, height: H * 0.45,
         borderRadius: W,
-        backgroundColor: 'rgba(26,159,227,0.025)',
+        backgroundColor: 'rgba(255,255,255,0.018)',
       }} />
       {PARTICLES.map((p, i) => {
         const opacity = anims[i].interpolate({

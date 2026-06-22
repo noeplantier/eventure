@@ -29,6 +29,7 @@ import { LinearGradient }    from 'expo-linear-gradient';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { supabase }          from '@/lib/supabase';
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
+import { AuthProvider }           from '../lib/authContext';
 import { setupNotifications }     from '../lib/notifications';
 import { getWorkingUid, getWorkingOrganizerId } from '../lib/mockUser';
 import CustomNavBar               from '../components/CustomNavBar';
@@ -58,7 +59,7 @@ const PARTICLES = Array.from({ length: 80 }, (_, i) => ({
   r:    i % 7 === 0 ? 1.8 : i % 3 === 0 ? 1.1 : 0.6,
   op:   0.10 + (i % 8) * 0.05,
   // Vert pour les grandes, or pour les moyennes, blanc pour les petites
-  col:  i % 7 === 0 ? '#1A9FE3' : i % 3 === 0 ? '#F5C842' : 'rgba(255,255,255,0.70)',
+  col:  i % 7 === 0 ? 'rgba(255,255,255,0.55)' : i % 3 === 0 ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.70)',
 }));
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -91,7 +92,7 @@ const ScreenshotOverlay = React.memo(function ScreenshotOverlay({
     >
       {/* Fond dégradé Eventure — identique structure Universe mais vert sombre */}
       <LinearGradient
-        colors={['#050E1B', '#091628', '#0C1A30', '#050E1B']}
+        colors={['#0F172A', '#091628', '#0C1A30', '#0F172A']}
         locations={[0, 0.35, 0.70, 1]}
         style={StyleSheet.absoluteFill}
       />
@@ -118,7 +119,7 @@ const ScreenshotOverlay = React.memo(function ScreenshotOverlay({
         width:            SW * 1.50,
         height:           SH * 0.45,
         borderRadius:     SW,
-        backgroundColor: 'rgba(26,159,227,0.04)',
+        backgroundColor: 'rgba(255,255,255,0.015)',
       }}/>
 
       {/* Halo or bas droite */}
@@ -171,20 +172,20 @@ const ov = StyleSheet.create({
   },
   iconBox: {
     width: 84, height: 84, borderRadius: 22,
-    backgroundColor: 'rgba(26,159,227,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1.5, borderColor: 'rgba(0,217,126,0.18)',
     alignItems: 'center', justifyContent: 'center', marginBottom: 4,
   },
   title:   { color: '#fff', fontSize: 26, fontWeight: '900', letterSpacing: 5, textTransform: 'uppercase' },
   eyebrow: { color: 'rgba(0,217,126,0.38)', fontSize: 10, letterSpacing: 1.8, textTransform: 'uppercase', marginTop: -6, textAlign: 'center' },
-  divider: { width: 44, height: 1, backgroundColor: 'rgba(26,159,227,0.14)', borderRadius: 1, marginVertical: 2 },
+  divider: { width: 44, height: 1, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 1, marginVertical: 2 },
   msg:     { color: 'rgba(255,255,255,0.72)', fontSize: 15, fontWeight: '700', textAlign: 'center', letterSpacing: -0.2 },
   sub:     { color: 'rgba(255,255,255,0.26)', fontSize: 11, textAlign: 'center', lineHeight: 17, marginTop: -2 },
   badge: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 13, paddingVertical: 6, borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(0,217,126,0.10)',
-    backgroundColor: 'rgba(26,159,227,0.03)', marginTop: 6,
+    backgroundColor: 'rgba(255,255,255,0.015)', marginTop: 6,
   },
   badgeTxt: { color: 'rgba(0,217,126,0.32)', fontSize: 8.5, fontWeight: '800', letterSpacing: 1.8, textTransform: 'uppercase' },
 });
@@ -268,7 +269,7 @@ function NavBarWrapper() {
 
   // Afficher UNIQUEMENT sur les 5 pages principales (tabs) de l'organisateur
   const tabRoutes = [
-    '/dashboard', '/events', '/staff', '/missions', '/calendar',
+    '/dashboard', '/events', '/staff', '/payroll', '/calendar',
   ];
   const isOnTab = tabRoutes.some(r => pathname.endsWith(r));
 
@@ -321,7 +322,7 @@ function ThemedApp() {
       <Stack
         screenOptions={{
           headerShown:      false,
-          contentStyle:     { backgroundColor: '#050E1B' },
+          contentStyle:     { backgroundColor: '#030B1E' },
           animation:        Platform.OS === 'ios' ? 'default' : 'fade',
           gestureEnabled:   true,
           gestureDirection: 'horizontal',
@@ -336,6 +337,7 @@ function ThemedApp() {
         <Stack.Screen name="(organizer)/events"       options={{ animation: 'none' }}/>
         <Stack.Screen name="(organizer)/staff"        options={{ animation: 'none' }}/>
         <Stack.Screen name="(organizer)/missions"     options={{ animation: 'none' }}/>
+        <Stack.Screen name="(organizer)/payroll"      options={{ animation: 'none' }}/>
         <Stack.Screen name="(organizer)/calendar"     options={{ animation: 'none' }}/>
 
         {/* ── Organisateur — modals / push ── */}
@@ -353,6 +355,8 @@ function ThemedApp() {
           options={{ animation: 'slide_from_bottom', gestureDirection: 'vertical' }}/>
         <Stack.Screen name="(organizer)/analytics"
           options={{ animation: 'slide_from_bottom', gestureDirection: 'vertical' }}/>
+        <Stack.Screen name="(organizer)/notifications"
+          options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom' }}/>
 
         {/* ── Staff ── */}
         <Stack.Screen name="(staff)/feed"
@@ -389,9 +393,11 @@ function ThemedApp() {
 export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <ThemedApp />
-      </ThemeProvider>
+      <AuthProvider>
+        <ThemeProvider>
+          <ThemedApp />
+        </ThemeProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

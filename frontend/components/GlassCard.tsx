@@ -1,6 +1,7 @@
 /**
- * GlassCard — Apple Liquid Glass material for React Native
+ * GlassCard — Apple iOS 26 "Liquid Glass" material for React Native
  * Usage: <GlassCard style={...}>{children}</GlassCard>
+ *        <GlassPad style={...}>{children}</GlassPad>  ← with 18px built-in padding
  */
 import React from 'react';
 import { StyleSheet, View, ViewStyle } from 'react-native';
@@ -8,62 +9,69 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 
 interface GlassCardProps {
-  children: React.ReactNode;
-  style?: ViewStyle | ViewStyle[];
-  radius?: number;
-  intensity?: number;
-  /** 'blue' = blue-tinted glass, 'white' = neutral, 'gold' = warm tint */
-  tint?: 'blue' | 'white' | 'gold';
-  border?: boolean;
+  children    : React.ReactNode;
+  style?      : ViewStyle | ViewStyle[];
+  intensity?  : number;   // blur intensity, default 18
+  radius?     : number;   // border radius, default 22
+  specular?   : boolean;  // show top specular highlight, default true
+  tint?       : 'dark' | 'light' | 'default' | 'systemUltraThinMaterialDark' | 'systemChromeMaterialDark';
+  accentColor?: string;   // border color, default undefined (white glass)
+  padding?    : number;   // inner padding, default 0 (let consumer handle it)
 }
 
-const TINT_COLORS: Record<string, [string, string, string]> = {
-  blue:  ['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.03)', 'rgba(26,159,227,0.02)'],
-  white: ['rgba(255,255,255,0.14)', 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0.01)'],
-  gold:  ['rgba(255,255,255,0.10)',  'rgba(255,255,255,0.04)',  'rgba(245,200,66,0.01)'],
-};
-
-const BORDER_COLORS: Record<string, string> = {
-  blue:  'rgba(255,255,255,0.12)',
-  white: 'rgba(255,255,255,0.18)',
-  gold:  'rgba(255,255,255,0.16)',
-};
-
 export default function GlassCard({
-  children, style, radius = 20, intensity = 50, tint = 'blue', border = true,
+  children,
+  style,
+  intensity   = 18,
+  radius      = 22,
+  specular    = true,
+  tint        = 'systemUltraThinMaterialDark',
+  accentColor,
+  padding     = 0,
 }: GlassCardProps) {
-  const colors = TINT_COLORS[tint];
-  const borderColor = BORDER_COLORS[tint];
-
   return (
-    <View style={[{ borderRadius: radius, overflow: 'hidden' }, style]}>
-      {/* Dark base */}
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(5,14,27,0.72)', borderRadius: radius }]} />
-      {/* Blur layer */}
-      <BlurView intensity={intensity} tint="dark" style={[StyleSheet.absoluteFill, { borderRadius: radius }]} />
-      {/* Color tint gradient */}
-      <LinearGradient
-        colors={colors}
-        locations={[0, 0.5, 1]}
-        style={[StyleSheet.absoluteFill, { borderRadius: radius }]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0.4, y: 1 }}
-      />
-      {/* Top sheen */}
-      <View style={{
-        position: 'absolute', top: 0, left: radius * 0.5, right: radius * 0.5,
-        height: 1, backgroundColor: 'rgba(255,255,255,0.32)', borderRadius: 1,
-      }} />
-      {/* Border overlay */}
-      {border && (
-        <View style={[StyleSheet.absoluteFill, {
-          borderRadius: radius,
-          borderWidth: 1,
-          borderColor,
-        }]} />
-      )}
-      {/* Content */}
+    <BlurView
+      intensity={intensity}
+      tint={tint}
+      style={[{ borderRadius: radius, overflow: 'hidden' }, style]}
+    >
+      <View
+        style={{
+          backgroundColor : 'rgba(255,255,255,0.06)',
+          borderRadius    : radius,
+          borderWidth     : StyleSheet.hairlineWidth,
+          borderColor     : accentColor ? accentColor + '70' : 'rgba(255,255,255,0.10)',
+          padding         : padding,
+          overflow        : 'hidden',
+        }}
+      >
+        {specular && (
+          <LinearGradient
+            colors={['rgba(255,255,255,0.10)', 'rgba(255,255,255,0.02)', 'transparent']}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={{
+              position          : 'absolute',
+              top               : 0,
+              left              : 0,
+              right             : 0,
+              height            : 56,
+              borderTopLeftRadius : radius,
+              borderTopRightRadius: radius,
+            }}
+          />
+        )}
+        {children}
+      </View>
+    </BlurView>
+  );
+}
+
+// Convenience variant with built-in padding
+export function GlassPad({ children, style, ...props }: GlassCardProps) {
+  return (
+    <GlassCard padding={18} style={style} {...props}>
       {children}
-    </View>
+    </GlassCard>
   );
 }

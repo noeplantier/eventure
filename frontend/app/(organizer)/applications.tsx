@@ -1,6 +1,6 @@
 /**
  * app/(organizer)/applications.tsx — EVENTURE v3 · Liquid Glass
- * Palette: #050E1B bg · #1A9FE3 blue · white
+ * Palette: #0F172A bg · #6366F1 indigo · white
  * Icons: Ionicons from @expo/vector-icons
  * Features: search bar · filter tabs · sort · realtime · optimistic update
  *
@@ -23,11 +23,13 @@ import { SafeAreaView }   from 'react-native-safe-area-context';
 import { useRouter }      from 'expo-router';
 import { supabase }       from '@/lib/supabase';
 import { getWorkingUid }  from '@/lib/mockUser';
+import { sendMissionNotification } from '@/lib/emailNotifications';
+import { createNotification } from '@/lib/notificationService';
 
-/* ─── Palette — 2 blues + white only ────────────────────────────────────── */
+/* ─── Palette — navy + white ONLY ───────────────────────────────────────── */
 const { width: SW, height: SH } = Dimensions.get('window');
-const BG   = '#050E1B';
-const BLUE = '#1A9FE3';
+const BG   = '#020818';
+const BLUE = '#FFFFFF';
 const EDGE = 20;
 
 const T = {
@@ -35,16 +37,16 @@ const T = {
   offWhite: 'rgba(255,255,255,0.88)',
   muted   : 'rgba(255,255,255,0.50)',
   faint   : 'rgba(255,255,255,0.18)',
-  surf    : 'rgba(255,255,255,0.045)',
+  surf    : 'rgba(255,255,255,0.05)',
   surfHi  : 'rgba(255,255,255,0.09)',
-  border  : 'rgba(255,255,255,0.05)',
-  borderHi: 'rgba(255,255,255,0.12)',
-  navy    : '#0C1A30',
+  border  : 'rgba(255,255,255,0.08)',
+  borderHi: 'rgba(255,255,255,0.20)',
+  navy    : 'rgba(255,255,255,0.04)',
   amber   : 'rgba(255,255,255,0.65)',
   red     : 'rgba(255,255,255,0.45)',
-  green   : '#1A9FE3',
-  blue    : '#1A9FE3',
-  purple  : '#1A9FE3',
+  green   : '#FFFFFF',
+  blue    : '#FFFFFF',
+  purple  : '#FFFFFF',
 } as const;
 
 /* ─── Types ────────────────────────────────────────────────────────────── */
@@ -76,10 +78,10 @@ interface AppDetail {
 
 /* ─── Status config ────────────────────────────────────────────────────── */
 const SV: Record<AppStatus, { l: string; c: string; bg: string; border: string }> = {
-  pending  : { l: 'En attente',   c: T.amber,  bg: 'rgba(255,255,255,0.07)',  border: 'rgba(255,255,255,0.18)'  },
+  pending  : { l: 'En attente',   c: "#FFFFFF",  bg: 'rgba(255,255,255,0.07)',  border: 'rgba(255,255,255,0.18)'  },
   accepted : { l: 'Accepté',      c: BLUE,     bg: 'rgba(255,255,255,0.04)',   border: 'rgba(255,255,255,0.07)'   },
-  rejected : { l: 'Refusé',       c: T.red,    bg: 'rgba(255,255,255,0.05)',  border: 'rgba(255,255,255,0.14)'  },
-  cancelled: { l: 'Désistement',  c: T.muted,  bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.10)'  },
+  rejected : { l: 'Refusé',       c: "#FFFFFF",    bg: 'rgba(255,255,255,0.05)',  border: 'rgba(255,255,255,0.14)'  },
+  cancelled: { l: 'Désistement',  c: "#FFFFFF",  bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.10)'  },
 };
 
 /* ─── Helpers ──────────────────────────────────────────────────────────── */
@@ -96,7 +98,7 @@ const fmt = (iso: string) =>
 /* ─── Particle Background ────────────────────────────────────────────────── */
 const _NUM_P = 28;
 const _PCOLS = [
-  '#1A9FE3', 'rgba(26,159,227,0.55)', '#1A9FE3', 'rgba(26,159,227,0.40)',
+  'rgba(255,255,255,0.55)', 'rgba(255,255,255,0.35)', 'rgba(255,255,255,0.20)',
   'rgba(255,255,255,0.28)', 'rgba(255,255,255,0.16)', 'rgba(255,255,255,0.07)',
 ];
 const _PARTS = Array.from({ length: _NUM_P }, (_, i) => ({
@@ -123,7 +125,7 @@ function ParticleBg() {
   }, []);
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <LinearGradient colors={['#050E1B', '#091628', '#05112A', '#050E1B']} locations={[0, 0.3, 0.7, 1]} style={StyleSheet.absoluteFill}/>
+      <LinearGradient colors={['#030B1E', '#061530', '#0A1D45', '#030B1E']} locations={[0, 0.3, 0.7, 1]} style={StyleSheet.absoluteFill}/>
       {_PARTS.map((p, i) => {
         const opacity = anims[i].interpolate({ inputRange: [0, 1], outputRange: [0.10, p.glow ? 0.80 : 0.52] });
         const scale   = anims[i].interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.4] });
@@ -190,7 +192,7 @@ const LiveDot = memo(() => {
 const AlertBar = memo(({ alerts }: { alerts: { id: string; type: string; msg: string }[] }) => {
   if (!alerts.length) return null;
   const cfg: { [k: string]: { c: string; icon: React.ComponentProps<typeof Ionicons>['name'] } } = {
-    warning: { c: T.amber,  icon: 'warning-outline'           },
+    warning: { c: "#FFFFFF",  icon: 'warning-outline'           },
     info   : { c: BLUE,     icon: 'information-circle-outline' },
     success: { c: BLUE,     icon: 'checkmark-circle-outline'   },
   };
@@ -227,7 +229,7 @@ const FunnelRow = memo(({ label, value, total, color }: {
   return (
     <View style={{ gap: 3 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ color: T.muted, fontSize: 10, fontWeight: '600' }}>{label}</Text>
+        <Text style={{ color: T.white, fontSize: 10, fontWeight: '600' }}>{label}</Text>
         <Text style={{ color, fontWeight: '800', fontSize: 11 }}>{value}</Text>
       </View>
       <View style={{ height: 4, borderRadius: 2, backgroundColor: T.faint, overflow: 'hidden' }}>
@@ -330,8 +332,8 @@ const ActionModal = memo(function ActionModal({ app, onClose, onConfirm }: {
               <Ionicons name="close" size={20} color={T.muted} />
             </TouchableOpacity>
           </View>
-          <Text style={{ color: T.muted, fontSize: 12, fontWeight: '600', marginBottom: 10 }}>
-            Motif <Text style={{ color: T.faint, fontWeight: '400' }}>(optionnel)</Text>
+          <Text style={{ color: T.white, fontSize: 12, fontWeight: '600', marginBottom: 10 }}>
+            Motif <Text style={{ color: T.white, fontWeight: '400' }}>(optionnel)</Text>
           </Text>
           <View style={{ backgroundColor: T.surf, borderRadius: 14, padding: 14,
             borderWidth: StyleSheet.hairlineWidth, borderColor: T.border }}>
@@ -341,13 +343,13 @@ const ActionModal = memo(function ActionModal({ app, onClose, onConfirm }: {
               placeholderTextColor={T.faint} multiline numberOfLines={3}
               value={reason} onChangeText={setReason} maxLength={300}
             />
-            <Text style={{ color: T.faint, fontSize: 10, alignSelf: 'flex-end', marginTop: 4 }}>
+            <Text style={{ color: T.white, fontSize: 10, alignSelf: 'flex-end', marginTop: 4 }}>
               {reason.length}/300
             </Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
             <TouchableOpacity style={am.cancelBtn} onPress={onClose} activeOpacity={0.75}>
-              <Text style={{ color: T.muted, fontWeight: '600', fontSize: 14 }}>Annuler</Text>
+              <Text style={{ color: T.white, fontWeight: '600', fontSize: 14 }}>Annuler</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[am.confirmBtn, { backgroundColor: `${color}12`, borderColor: `${color}30` }]}
@@ -426,7 +428,7 @@ const AppCard = memo(function AppCard({ app, index, onAccept, onReject, onChat, 
             <Ionicons name="calendar-outline" size={12} color={sv.c} />
           </View>
           <Text style={ac.eventTxt} numberOfLines={1}>{app.event_title}</Text>
-          <Text style={{ color: T.muted, fontSize: 10 }}>{fmt(app.date_start)}</Text>
+          <Text style={{ color: T.white, fontSize: 10 }}>{fmt(app.date_start)}</Text>
           {isNew && <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: T.red, marginLeft: 2 }} />}
           <Ionicons name="chevron-forward" size={11} color={T.faint} />
         </TouchableOpacity>
@@ -456,15 +458,15 @@ const AppCard = memo(function AppCard({ app, index, onAccept, onReject, onChat, 
                 ))}
               </View>
               <Text style={{ color: T.white, fontSize: 11, fontWeight: '800' }}>{app.staff_rating.toFixed(1)}</Text>
-              <Text style={{ color: T.faint, fontSize: 10 }}>·</Text>
-              <Text style={{ color: T.muted, fontSize: 10 }}>
+              <Text style={{ color: T.white, fontSize: 10 }}>·</Text>
+              <Text style={{ color: T.white, fontSize: 10 }}>
                 {app.missions_count} mission{app.missions_count > 1 ? 's' : ''}
               </Text>
               {app.experience_years != null && app.experience_years > 0 &&
-                <Text style={{ color: T.faint, fontSize: 10 }}>· {app.experience_years}ans</Text>}
+                <Text style={{ color: T.white, fontSize: 10 }}>· {app.experience_years}ans</Text>}
             </View>
             {!!app.staff_bio && app.status === 'pending' && (
-              <Text style={{ color: T.offWhite, fontSize: 11, fontStyle: 'italic', lineHeight: 15 }} numberOfLines={1}>
+              <Text style={{ color: T.white, fontSize: 11, fontStyle: 'italic', lineHeight: 15 }} numberOfLines={1}>
                 {app.staff_bio}
               </Text>
             )}
@@ -476,9 +478,9 @@ const AppCard = memo(function AppCard({ app, index, onAccept, onReject, onChat, 
               <Text style={{ color: sv.c, fontSize: 9, fontWeight: '800' }}>{sv.l}</Text>
             </View>
             <Text style={{ color: T.white, fontSize: 16, fontWeight: '900', letterSpacing: -0.4 }}>
-              {app.hourly_rate}<Text style={{ fontSize: 10, color: T.muted }}>€/h</Text>
+              {app.hourly_rate}<Text style={{ fontSize: 10, color: T.white }}>€/h</Text>
             </Text>
-            <Text style={{ color: T.muted, fontSize: 9 }}>{ago(app.applied_at)}</Text>
+            <Text style={{ color: T.white, fontSize: 9 }}>{ago(app.applied_at)}</Text>
           </View>
         </View>
 
@@ -487,7 +489,7 @@ const AppCard = memo(function AppCard({ app, index, onAccept, onReject, onChat, 
           <View style={{ padding: 10, borderRadius: 12, backgroundColor: T.surf,
             borderLeftWidth: 2, borderLeftColor: `${sv.c}40`,
             borderWidth: StyleSheet.hairlineWidth, borderColor: T.border }}>
-            <Text style={{ color: T.offWhite, fontSize: 11, fontStyle: 'italic', lineHeight: 16 }} numberOfLines={2}>
+            <Text style={{ color: T.white, fontSize: 11, fontStyle: 'italic', lineHeight: 16 }} numberOfLines={2}>
               {app.message}
             </Text>
           </View>
@@ -496,7 +498,7 @@ const AppCard = memo(function AppCard({ app, index, onAccept, onReject, onChat, 
         {/* ── Slots fill bar ── */}
         <View style={{ gap: 5 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Text style={{ color: T.muted, fontSize: 10, fontWeight: '600' }}>
+            <Text style={{ color: T.white, fontSize: 10, fontWeight: '600' }}>
               Postes : <Text style={{ color: T.white, fontWeight: '700' }}>{app.slots_filled}</Text>/{app.slots}
             </Text>
             <Text style={{ color: fillC, fontSize: 10, fontWeight: '800' }}>{Math.round(pct * 100)}%</Text>
@@ -511,14 +513,14 @@ const AppCard = memo(function AppCard({ app, index, onAccept, onReject, onChat, 
           <View style={ac.actions}>
             <TouchableOpacity style={ac.msgBtn} onPress={onChat} activeOpacity={0.78}>
               <Ionicons name="chatbubble-outline" size={13} color={T.muted} />
-              <Text style={{ color: T.muted, fontSize: 11, fontWeight: '600' }}>Message</Text>
+              <Text style={{ color: T.white, fontSize: 11, fontWeight: '600' }}>Message</Text>
             </TouchableOpacity>
             <TouchableOpacity style={ac.rejectBtn} onPress={onReject} activeOpacity={0.78}>
               <Ionicons name="close" size={14} color={T.red} />
-              <Text style={{ color: T.red, fontSize: 11, fontWeight: '700' }}>Refuser</Text>
+              <Text style={{ color: T.white, fontSize: 11, fontWeight: '700' }}>Refuser</Text>
             </TouchableOpacity>
             <TouchableOpacity style={ac.acceptBtn} onPress={onAccept} activeOpacity={0.85}>
-              <LinearGradient colors={['rgba(255,255,255,0.12)', 'rgba(26,159,227,0.14)']} style={ac.acceptGrad}>
+              <LinearGradient colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.08)']} style={ac.acceptGrad}>
                 <Ionicons name="checkmark" size={14} color={BLUE} />
                 <Text style={{ color: BLUE, fontSize: 12, fontWeight: '900' }}>Accepter</Text>
               </LinearGradient>
@@ -529,13 +531,13 @@ const AppCard = memo(function AppCard({ app, index, onAccept, onReject, onChat, 
           <View style={ac.actions}>
             <TouchableOpacity style={ac.msgBtn} onPress={onChat} activeOpacity={0.78}>
               <Ionicons name="chatbubble-outline" size={13} color={T.muted} />
-              <Text style={{ color: T.muted, fontSize: 11, fontWeight: '600' }}>Contacter</Text>
+              <Text style={{ color: T.white, fontSize: 11, fontWeight: '600' }}>Contacter</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[ac.rejectBtn, { flex: 1, borderColor: 'rgba(255,255,255,0.20)', backgroundColor: 'rgba(255,255,255,0.05)' }]}
               onPress={onReject} activeOpacity={0.78}>
               <Ionicons name="exit-outline" size={13} color={T.amber} />
-              <Text style={{ color: T.amber, fontSize: 11, fontWeight: '700' }}>Annuler la sélection</Text>
+              <Text style={{ color: T.white, fontSize: 11, fontWeight: '700' }}>Annuler la sélection</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -563,7 +565,7 @@ const ac = StyleSheet.create({
   card     : { borderRadius: 20, overflow: 'hidden', padding: 16, gap: 11, backgroundColor: T.navy },
   eventRow : { flexDirection: 'row', alignItems: 'center', gap: 7 },
   eventIcon: { width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  eventTxt : { flex: 1, color: T.muted, fontSize: 11, fontWeight: '600' },
+  eventTxt : { flex: 1, color: T.white, fontSize: 11, fontWeight: '600' },
   avatar   : { width: 52, height: 52, borderRadius: 14, backgroundColor: T.navy },
   avatarFb : { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.04)',
     borderWidth: 1.5, borderColor: T.border },
@@ -694,11 +696,46 @@ export default function ApplicationsScreen() {
     } catch (e) { console.error('[updateStatus]', e); setApps(snap); }
   }, [load]);
 
-  const handleAccept   = useCallback((app: AppDetail) => updateStatus(app.id, 'accepted'), [updateStatus]);
+  const handleAccept   = useCallback(async (app: AppDetail) => {
+    updateStatus(app.id, 'accepted');
+    sendMissionNotification({
+      staffName  : app.staff_name,
+      eventTitle : app.event_title,
+      missionDate: app.date_start,
+      role       : app.role,
+      amount     : app.hourly_rate,
+      action     : 'confirmed',
+    });
+    const uid = await getWorkingUid();
+    if (uid) createNotification({
+      userId: uid,
+      type: 'mission_confirmed',
+      title: 'Candidature acceptée',
+      body: `${app.staff_name} confirmé(e) — ${app.role} · ${app.event_title}`,
+      data: { appId: app.id, eventId: app.event_id },
+    });
+  }, [updateStatus]);
   const handleReject   = useCallback((app: AppDetail) => setRejectTarget(app), []);
-  const handleRejectOk = useCallback((reason: string) => {
+  const handleRejectOk = useCallback(async (reason: string) => {
     if (!rejectTarget) return;
-    updateStatus(rejectTarget.id, rejectTarget.status === 'accepted' ? 'cancelled' : 'rejected', reason);
+    const newStatus = rejectTarget.status === 'accepted' ? 'cancelled' : 'rejected';
+    updateStatus(rejectTarget.id, newStatus, reason);
+    sendMissionNotification({
+      staffName  : rejectTarget.staff_name,
+      eventTitle : rejectTarget.event_title,
+      missionDate: rejectTarget.date_start,
+      role       : rejectTarget.role,
+      amount     : 0,
+      action     : 'rejected',
+    });
+    const uid = await getWorkingUid();
+    if (uid) createNotification({
+      userId: uid,
+      type: 'mission_rejected',
+      title: 'Candidature refusée',
+      body: `${rejectTarget.staff_name} refusé(e) — ${rejectTarget.role} · ${rejectTarget.event_title}`,
+      data: { appId: rejectTarget.id, eventId: rejectTarget.event_id },
+    });
     setRejectTarget(null);
   }, [rejectTarget, updateStatus]);
 
@@ -782,7 +819,7 @@ export default function ApplicationsScreen() {
             <Ionicons name="arrow-back" size={18} color={T.muted} />
           </TouchableOpacity>
           <View style={{ flex: 1, paddingHorizontal: 12, gap: 1 }}>
-            <Text style={[ds.navLabel, { color: T.muted }]}>Gestion</Text>
+            <Text style={[ds.navLabel, { color: T.white }]}>Gestion</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Text style={[ds.title, { color: T.white }]}>Candidatures</Text>
               <LiveDot />
@@ -821,8 +858,8 @@ export default function ApplicationsScreen() {
 
         <ScrollView
           showsVerticalScrollIndicator={false}
-          style={{ flex: 1, backgroundColor: '#050E1B' }}
-          contentContainerStyle={{ backgroundColor: '#050E1B', flexGrow: 1, paddingBottom: 130 }}
+          style={{ flex: 1, backgroundColor: '#0F172A' }}
+          contentContainerStyle={{ backgroundColor: '#0F172A', flexGrow: 1, paddingBottom: 130 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -847,7 +884,7 @@ export default function ApplicationsScreen() {
               {/* ── KPI STRIP ── */}
               <View style={ds.kpiRow}>
                 {[
-                  { l: 'En attente', v: pendingCount,  c: T.amber,  icon: 'time-outline' as const       },
+                  { l: 'En attente', v: pendingCount,  c: "#FFFFFF",  icon: 'time-outline' as const       },
                   { l: 'Acceptées',  v: acceptedCount, c: BLUE,     icon: 'checkmark-circle-outline' as const },
                   { l: 'Taux',       v: acceptRate,    c: BLUE,     icon: 'trending-up-outline' as const, suffix: '%' },
                   { l: 'Total',      v: apps.length,   c: T.white,  icon: 'document-text-outline' as const },
@@ -856,7 +893,7 @@ export default function ApplicationsScreen() {
                     <LinearGradient colors={[`${c}12`, `${c}04`]} style={StyleSheet.absoluteFillObject} />
                     <Ionicons name={icon} size={14} color={c} />
                     <Counter value={v} suffix={suffix ?? ''} color={c} size={18} />
-                    <Text style={{ color: T.muted, fontSize: 9, fontWeight: '700', textAlign: 'center', lineHeight: 12 }}>{l}</Text>
+                    <Text style={{ color: T.white, fontSize: 9, fontWeight: '700', textAlign: 'center', lineHeight: 12 }}>{l}</Text>
                     <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
                       borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: `${c}20` }} />
                   </View>
@@ -883,14 +920,14 @@ export default function ApplicationsScreen() {
               {/* ── STATUS TABS + SORT ── */}
               <View style={{ flexDirection: 'row', alignItems: 'center', paddingRight: EDGE }}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ backgroundColor: '#050E1B', flexGrow: 1, paddingHorizontal: EDGE, paddingBottom: 10, gap: 8 }} style={{ backgroundColor: '#050E1B' }}>
+                  contentContainerStyle={{ backgroundColor: '#0F172A', flexGrow: 1, paddingHorizontal: EDGE, paddingBottom: 10, gap: 8 }} style={{ backgroundColor: '#0F172A' }}>
                   {TABS.map(([k, l, n]) => (
                     <TouchableOpacity key={k}
                       style={[ds.chip,
                         { backgroundColor: T.surf, borderColor: T.border },
                         tab === k && { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: T.borderHi }]}
                       onPress={() => setTab(k)} activeOpacity={0.75}>
-                      <Text style={[ds.chipTxt, { color: T.offWhite },
+                      <Text style={[ds.chipTxt, { color: T.white },
                         tab === k && { color: BLUE, fontWeight: '800' }]}>{l}</Text>
                       {n > 0 && <Text style={{ color: tab === k ? BLUE : T.muted, fontSize: 11, fontWeight: '700' }}> {n}</Text>}
                     </TouchableOpacity>
@@ -900,14 +937,14 @@ export default function ApplicationsScreen() {
                   style={[ds.chip, { marginBottom: 10, gap: 4, paddingHorizontal: 10,
                     backgroundColor: T.surf, borderColor: T.border }]} activeOpacity={0.78}>
                   <Ionicons name="swap-vertical-outline" size={11} color={T.muted} />
-                  <Text style={[ds.chipTxt, { fontSize: 11, color: T.offWhite }]}>{sortLabels[sortBy]}</Text>
+                  <Text style={[ds.chipTxt, { fontSize: 11, color: T.white }]}>{sortLabels[sortBy]}</Text>
                 </TouchableOpacity>
               </View>
 
               {/* ── EVENT FILTER ── */}
               {events.length > 1 && (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ backgroundColor: '#050E1B', flexGrow: 1, paddingHorizontal: EDGE, paddingBottom: 10, gap: 8 }} style={{ backgroundColor: '#050E1B' }}>
+                  contentContainerStyle={{ backgroundColor: '#0F172A', flexGrow: 1, paddingHorizontal: EDGE, paddingBottom: 10, gap: 8 }} style={{ backgroundColor: '#0F172A' }}>
                   {[{ id: null as string | null, title: 'Tous' }, ...events].map(e => (
                     <TouchableOpacity key={String(e.id)}
                       style={[ds.chip,
@@ -915,7 +952,7 @@ export default function ApplicationsScreen() {
                         filterEvt === e.id && { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: T.borderHi }]}
                       onPress={() => setFilterEvt(e.id)} activeOpacity={0.75}>
                       {e.id && <Ionicons name="calendar-outline" size={10} color={filterEvt === e.id ? BLUE : T.muted} />}
-                      <Text style={[ds.chipTxt, { color: T.offWhite },
+                      <Text style={[ds.chipTxt, { color: T.white },
                         filterEvt === e.id && { color: BLUE, fontWeight: '800' }]} numberOfLines={1}>
                         {e.title}
                       </Text>
@@ -934,7 +971,7 @@ export default function ApplicationsScreen() {
                       borderWidth: 1, borderColor: T.borderHi }}>
                       <Ionicons
                         name={tab === 'pending' ? 'time-outline' : 'document-text-outline'}
-                        size={38} color="rgba(26,159,227,0.45)"
+                        size={38} color="rgba(255,255,255,0.30)"
                       />
                     </View>
                     <Text style={{ color: T.white, fontSize: 17, fontWeight: '900', letterSpacing: -0.3 }}>
@@ -944,7 +981,7 @@ export default function ApplicationsScreen() {
                         : tab === 'rejected' ? 'Aucune refusée'
                         : 'Aucune candidature'}
                     </Text>
-                    <Text style={{ color: T.offWhite, fontSize: 13, textAlign: 'center', lineHeight: 20 }}>
+                    <Text style={{ color: T.white, fontSize: 13, textAlign: 'center', lineHeight: 20 }}>
                       {search
                         ? `Aucun résultat pour "${search}"`
                         : tab === 'pending'

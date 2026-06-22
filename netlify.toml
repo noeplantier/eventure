@@ -1,8 +1,11 @@
 [build]
-  base = "frontend"
+  base    = "frontend"
   command = "npx expo export -p web"
   publish = "dist"
-  environment = { NODE_VERSION = "20" }
+
+[build.environment]
+  NODE_VERSION = "20"
+  # Set EXPO_PUBLIC_SUPABASE_ANON_KEY in Netlify Dashboard → Site settings → Environment variables
 
 [[redirects]]
   from = "/*"

@@ -4,7 +4,7 @@
  * Pure event creation — 3 steps (Infos · Détails · Publier)
  * INSERT into `events` table ONLY — no roles, no missions.
  *
- * Design : #050E1B bg · #1A9FE3 primary · Apple Liquid Glass (BlurView + LinearGradient)
+ * Design : #0F172A bg · #6366F1 primary · Apple Liquid Glass (BlurView + LinearGradient)
  * Icons  : Ionicons from @expo/vector-icons (NO lucide, NO emojis)
  */
 import React, { useState, useCallback } from 'react';
@@ -32,38 +32,39 @@ import { supabase } from '@/lib/supabase';
 import { getWorkingOrganizerId } from '@/lib/mockUser';
 import { useInteractiveBg } from '@/components/InteractiveBg';
 
-/* ─── Palette ────────────────────────────────────────────────────────────── */
-const BG   = '#050E1B';
-const BLUE = '#1A9FE3';
+/* ─── Palette — navy + white ONLY ───────────────────────────────────────── */
+const BG   = '#020818';
+const BLUE = '#FFFFFF';
 const DIM  = 'rgba(255,255,255,0.06)';
 const EDGE = 20;
 
 const T = {
   white   : '#FFFFFF',
   offWhite: 'rgba(255,255,255,0.88)',
-  muted   : 'rgba(255,255,255,0.55)',
+  muted   : 'rgba(255,255,255,0.50)',
   faint   : 'rgba(255,255,255,0.22)',
   surf    : 'rgba(255,255,255,0.05)',
-  border  : 'rgba(255,255,255,0.06)',
-  borderHi: 'rgba(26,159,227,0.45)',
-  navy    : '#0B1829',
-  red     : '#F87171',
-  redDim  : 'rgba(248,113,113,0.12)',
-  redBdr  : 'rgba(248,113,113,0.30)',
+  border  : 'rgba(255,255,255,0.08)',
+  borderHi: 'rgba(255,255,255,0.35)',
+  navy    : 'rgba(255,255,255,0.04)',
+  red     : 'rgba(255,255,255,0.55)',
+  redDim  : 'rgba(255,255,255,0.08)',
+  redBdr  : 'rgba(255,255,255,0.20)',
 } as const;
 
-/* ─── Calendar theme ─────────────────────────────────────────────────────── */
+/* ─── Calendar theme — navy + white ─────────────────────────────────────── */
 const CAL_THEME = {
   backgroundColor: 'transparent',
   calendarBackground: 'transparent',
-  textSectionTitleColor: 'rgba(255,255,255,0.45)',
-  selectedDayBackgroundColor: '#1A9FE3',
-  selectedDayTextColor: '#FFFFFF',
-  todayTextColor: '#1A9FE3',
+  textSectionTitleColor: 'rgba(255,255,255,0.55)',
+  selectedDayBackgroundColor: '#FFFFFF',
+  selectedDayTextColor: '#020818',
+  todayTextColor: '#FFFFFF',
+  todayBackgroundColor: 'rgba(255,255,255,0.12)',
   dayTextColor: '#FFFFFF',
   textDisabledColor: 'rgba(255,255,255,0.20)',
-  dotColor: '#1A9FE3',
-  arrowColor: '#1A9FE3',
+  dotColor: '#FFFFFF',
+  arrowColor: '#FFFFFF',
   monthTextColor: '#FFFFFF',
   textDayFontWeight: '500' as const,
   textMonthFontWeight: '700' as const,
@@ -136,7 +137,7 @@ const gc = StyleSheet.create({
 /* ─── Section label ──────────────────────────────────────────────────────── */
 function Label({ text }: { text: string }) {
   return (
-    <Text style={{ color: T.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.8 }}>
+    <Text style={{ color: T.white, fontSize: 11, fontWeight: '700', letterSpacing: 0.8 }}>
       {text}
     </Text>
   );
@@ -191,10 +192,10 @@ function Field({
       {hasError && errorMsg ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
           <Ionicons name="alert-circle-outline" size={12} color={T.red} />
-          <Text style={{ color: T.red, fontSize: 11 }}>{errorMsg}</Text>
+          <Text style={{ color: T.white, fontSize: 11 }}>{errorMsg}</Text>
         </View>
       ) : hint ? (
-        <Text style={{ color: T.faint, fontSize: 11 }}>{hint}</Text>
+        <Text style={{ color: T.white, fontSize: 11 }}>{hint}</Text>
       ) : null}
     </View>
   );
@@ -316,7 +317,7 @@ function SummaryRow({ icon, value }: { icon: string; value: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
       <Ionicons name={icon as any} size={14} color={T.muted} style={{ marginTop: 1 }} />
-      <Text style={{ color: T.muted, fontSize: 13, flex: 1, lineHeight: 19 }}>{value}</Text>
+      <Text style={{ color: T.white, fontSize: 13, flex: 1, lineHeight: 19 }}>{value}</Text>
     </View>
   );
 }
@@ -463,7 +464,7 @@ export default function CreateEventScreen() {
         <View style={{ flexDirection: 'row', gap: 10 }}>
           {/* Date de début */}
           <View style={{ flex: 1, marginBottom: 16 }}>
-            <Text style={{ color: 'rgba(255,255,255,0.50)', fontSize: 10.5, fontWeight: '700', letterSpacing: 1.2, marginBottom: 8 }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 10.5, fontWeight: '700', letterSpacing: 1.2, marginBottom: 8 }}>
               DATE DE DÉBUT *
             </Text>
             <TouchableOpacity
@@ -478,7 +479,7 @@ export default function CreateEventScreen() {
               <Text style={{ color: form.date_start ? '#FFFFFF' : 'rgba(255,255,255,0.30)', fontSize: 15 }}>
                 {form.date_start || 'Sélectionner'}
               </Text>
-              <Ionicons name="calendar-outline" size={18} color="#1A9FE3" />
+              <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
             </TouchableOpacity>
             {errors.date_start && (
               <Text style={{ color: 'rgba(255,80,80,0.8)', fontSize: 11, marginTop: 4 }}>{errors.date_start}</Text>
@@ -487,7 +488,7 @@ export default function CreateEventScreen() {
 
           {/* Date de fin */}
           <View style={{ flex: 1, marginBottom: 16 }}>
-            <Text style={{ color: 'rgba(255,255,255,0.50)', fontSize: 10.5, fontWeight: '700', letterSpacing: 1.2, marginBottom: 8 }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 10.5, fontWeight: '700', letterSpacing: 1.2, marginBottom: 8 }}>
               DATE DE FIN
             </Text>
             <TouchableOpacity
@@ -502,7 +503,7 @@ export default function CreateEventScreen() {
               <Text style={{ color: form.date_end ? '#FFFFFF' : 'rgba(255,255,255,0.30)', fontSize: 15 }}>
                 {form.date_end || 'Sélectionner'}
               </Text>
-              <Ionicons name="calendar-outline" size={18} color="#1A9FE3" />
+              <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
         </View>
@@ -528,10 +529,10 @@ export default function CreateEventScreen() {
           }}
         >
           {geoLoading
-            ? <ActivityIndicator size="small" color="#1A9FE3" />
-            : <Ionicons name="navigate-outline" size={14} color="#1A9FE3" />
+            ? <ActivityIndicator size="small" color="#FFFFFF" />
+            : <Ionicons name="navigate-outline" size={14} color="#FFFFFF" />
           }
-          <Text style={{ color: '#1A9FE3', fontSize: 12, fontWeight: '600' }}>Ma position actuelle</Text>
+          <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '600' }}>Ma position actuelle</Text>
         </TouchableOpacity>
       </GlassCard>
     </View>
@@ -669,7 +670,7 @@ export default function CreateEventScreen() {
             onPress={() => upd('status', 'published')}
           />
         </View>
-        <Text style={{ color: T.faint, fontSize: 11, lineHeight: 16 }}>
+        <Text style={{ color: T.white, fontSize: 11, lineHeight: 16 }}>
           {form.status === 'draft'
             ? "L'evenement sera sauvegarde comme brouillon. Vous pourrez le publier plus tard."
             : "L'evenement sera immediatement visible et accessible aux staffs."}
@@ -680,7 +681,7 @@ export default function CreateEventScreen() {
       {!!errors.submit && (
         <View style={[ss.errCard, { marginBottom: 14 }]}>
           <Ionicons name="alert-circle-outline" size={16} color={T.red} />
-          <Text style={{ color: T.red, fontSize: 13, flex: 1, lineHeight: 18 }}>
+          <Text style={{ color: T.white, fontSize: 13, flex: 1, lineHeight: 18 }}>
             {errors.submit}
           </Text>
         </View>
@@ -734,7 +735,7 @@ export default function CreateEventScreen() {
         </TouchableOpacity>
 
         <View style={{ flex: 1, alignItems: 'center' }}>
-          <Text style={{ color: T.faint, fontSize: 11, fontWeight: '600', letterSpacing: 0.4 }}>
+          <Text style={{ color: T.white, fontSize: 11, fontWeight: '600', letterSpacing: 0.4 }}>
             ETAPE {step} SUR {STEP_LABELS.length}
           </Text>
           <Text style={{ color: T.white, fontSize: 16, fontWeight: '900', marginTop: 1 }}>
@@ -764,6 +765,7 @@ export default function CreateEventScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          style={{ flex: 1, backgroundColor: '#030B1E' }}
           contentContainerStyle={{
             paddingHorizontal: EDGE,
             paddingBottom: 160 + insets.bottom,
@@ -785,7 +787,7 @@ export default function CreateEventScreen() {
               style={ss.prevBtn}
             >
               <Ionicons name="arrow-back" size={16} color={T.muted} />
-              <Text style={{ color: T.muted, fontSize: 14, fontWeight: '600' }}>Retour</Text>
+              <Text style={{ color: T.white, fontSize: 14, fontWeight: '600' }}>Retour</Text>
             </TouchableOpacity>
           ) : (
             <View style={{ flex: 1 }} />
@@ -797,7 +799,7 @@ export default function CreateEventScreen() {
             style={{ flex: 2, borderRadius: 14, overflow: 'hidden' }}
           >
             <LinearGradient
-              colors={['rgba(255,255,255,0.12)', 'rgba(26,159,227,0.14)']}
+              colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.08)']}
               style={ss.nextGrad}
             >
               <Text style={{ color: BLUE, fontSize: 15, fontWeight: '900' }}>
@@ -825,14 +827,14 @@ export default function CreateEventScreen() {
             <Calendar
               theme={CAL_THEME}
               onDayPress={day => { upd('date_start', day.dateString + ' 20:00'); setShowCalStart(false); }}
-              markedDates={form.date_start ? { [form.date_start.split(' ')[0]]: { selected: true, selectedColor: '#1A9FE3' } } : {}}
+              markedDates={form.date_start ? { [form.date_start.split(' ')[0]]: { selected: true, selectedColor: '#FFFFFF' } } : {}}
               minDate={new Date().toISOString().split('T')[0]}
             />
             <TouchableOpacity
               onPress={() => setShowCalStart(false)}
               style={{ marginTop: 12, alignItems: 'center', padding: 14, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 14 }}
             >
-              <Text style={{ color: 'rgba(255,255,255,0.55)', fontWeight: '600' }}>Annuler</Text>
+              <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>Annuler</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -854,14 +856,14 @@ export default function CreateEventScreen() {
             <Calendar
               theme={CAL_THEME}
               onDayPress={day => { upd('date_end', day.dateString + ' 23:59'); setShowCalEnd(false); }}
-              markedDates={form.date_end ? { [form.date_end.split(' ')[0]]: { selected: true, selectedColor: '#1A9FE3' } } : {}}
+              markedDates={form.date_end ? { [form.date_end.split(' ')[0]]: { selected: true, selectedColor: '#FFFFFF' } } : {}}
               minDate={form.date_start?.split(' ')[0] || new Date().toISOString().split('T')[0]}
             />
             <TouchableOpacity
               onPress={() => setShowCalEnd(false)}
               style={{ marginTop: 12, alignItems: 'center', padding: 14, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 14 }}
             >
-              <Text style={{ color: 'rgba(255,255,255,0.55)', fontWeight: '600' }}>Annuler</Text>
+              <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>Annuler</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -904,7 +906,7 @@ const ss = StyleSheet.create({
     paddingHorizontal: EDGE, paddingTop: 14,
     backgroundColor: BG,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(26,159,227,0.14)',
+    borderTopColor: 'rgba(255,255,255,0.10)',
   },
   prevBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',

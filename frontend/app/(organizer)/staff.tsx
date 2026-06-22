@@ -4,7 +4,7 @@
  */
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated, Dimensions, Easing, Image, Modal, RefreshControl, ScrollView,
+  Alert, Animated, Dimensions, Easing, Image, Modal, RefreshControl, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { LinearGradient }  from 'expo-linear-gradient';
@@ -17,44 +17,46 @@ import { getWorkingUid }   from '@/lib/mockUser';
 
 /* ─── Design tokens ──────────────────────────────────────────────────────── */
 const { width: SW } = Dimensions.get('window');
-const BG    = '#050E1B';
-const BLUE  = '#1A9FE3';
-const NAVY  = '#0C1A30';
+const BG    = '#020818';
+const NAVY  = '#030B1E';
 const WHITE = '#FFFFFF';
-const MUTED = 'rgba(255,255,255,0.55)';
-const FAINT = 'rgba(255,255,255,0.08)';
+const MUTED = 'rgba(255,255,255,0.35)';
+const FAINT = 'rgba(255,255,255,0.06)';
+const GLASS  = 'rgba(255,255,255,0.06)';
+const BORDER = 'rgba(255,255,255,0.10)';
+const DIM    = 'rgba(255,255,255,0.35)';
 
-const SUCCESS = '#1A9FE3';
-const WARNING = 'rgba(255,255,255,0.65)';
+const SUCCESS = '#FFFFFF';
+const WARNING = 'rgba(255,255,255,0.60)';
 const EDGE    = 16;
 
 const T = {
   white   : WHITE,
-  offWhite: 'rgba(255,255,255,0.88)',
+  offWhite: WHITE,
   muted   : MUTED,
   faint   : FAINT,
   surf    : 'rgba(255,255,255,0.045)',
   surfHi  : 'rgba(255,255,255,0.09)',
-  border  : 'rgba(255,255,255,0.05)',
+  border  : BORDER,
   borderHi: 'rgba(255,255,255,0.12)',
   navy    : NAVY,
-  amber   : 'rgba(255,255,255,0.65)',
-  red     : 'rgba(255,255,255,0.45)',
-  blue    : '#1A9FE3',
-  purple  : '#1A9FE3',
+  amber   : WHITE,
+  red     : 'rgba(255,255,255,0.35)',
+  blue    : WHITE,
+  purple  : WHITE,
 } as const;
 
 /* ─── Particle background ────────────────────────────────────────────────── */
-const PCOLS = [BLUE, 'rgba(26,159,227,0.4)', '#1A9FE3', 'rgba(26,159,227,0.32)', 'rgba(255,255,255,0.16)'];
+const PCOLS = ['rgba(255,255,255,0.20)', 'rgba(255,255,255,0.10)', 'rgba(255,255,255,0.15)', 'rgba(255,255,255,0.08)', 'rgba(255,255,255,0.05)'];
 const PTS   = Array.from({ length: 18 }, (_, i) => ({
   id: i, x: ((Math.sin(i * 2.399) + 1) / 2) * SW, y: ((Math.cos(i * 1.618) + 1) / 2) * 900,
   sz: 0.8 + (i % 8) * 0.2, col: PCOLS[i % PCOLS.length], op: 0.04 + (i % 6) * 0.03,
 }));
 const ParticleBg = memo(() => (
   <View style={StyleSheet.absoluteFill} pointerEvents="none">
-    <LinearGradient colors={[BG, '#091628', BG]} style={StyleSheet.absoluteFill}/>
+    <LinearGradient colors={['#010610', '#020818', '#030B1E', '#041232', '#020818', '#010610']} style={StyleSheet.absoluteFill}/>
     <View style={{ position: 'absolute', top: '6%', left: '12%', width: SW * 0.7, height: SW * 0.7, borderRadius: SW * 0.35, backgroundColor: 'rgba(255,255,255,0.015)' }}/>
-    <View style={{ position: 'absolute', bottom: '8%', right: '-18%', width: SW * 0.6, height: SW * 0.6, borderRadius: SW * 0.3, backgroundColor: 'rgba(56,189,248,0.02)' }}/>
+    <View style={{ position: 'absolute', bottom: '8%', right: '-18%', width: SW * 0.6, height: SW * 0.6, borderRadius: SW * 0.3, backgroundColor: 'rgba(255,255,255,0.008)' }}/>
     {PTS.map(p => <View key={p.id} style={{ position: 'absolute', left: p.x, top: p.y, width: p.sz, height: p.sz, borderRadius: p.sz / 2, backgroundColor: p.col, opacity: p.op }}/>)}
   </View>
 ));
@@ -81,7 +83,7 @@ interface EngagedStaff extends StaffRow {
 type Tab = 'available' | 'engaged';
 
 /* ─── Avatar component ───────────────────────────────────────────────────── */
-function Avatar({ name, size = 44, bg = BLUE }: { name: string; size?: number; bg?: string }) {
+function Avatar({ name, size = 44, bg = 'rgba(255,255,255,0.10)' }: { name: string; size?: number; bg?: string }) {
   const initials = name
     .trim()
     .split(' ')
@@ -105,10 +107,10 @@ function StarRating({ rating, size = 16 }: { rating: number; size?: number }) {
           key={i}
           name={i <= Math.round(rating) ? 'star' : 'star-outline'}
           size={size}
-          color={i <= Math.round(rating) ? '#1A9FE3' : 'rgba(255,255,255,0.25)'}
+          color={i <= Math.round(rating) ? '#FFFFFF' : 'rgba(255,255,255,0.25)'}
         />
       ))}
-      <Text style={{ fontSize: size - 2, color: MUTED, marginLeft: 4 }}>{rating.toFixed(1)}</Text>
+      <Text style={{ fontSize: size - 2, color: WHITE, marginLeft: 4 }}>{rating.toFixed(1)}</Text>
     </View>
   );
 }
@@ -142,14 +144,14 @@ const StaffProfileModal = memo(function StaffProfileModal({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <View style={{ flex: 1, backgroundColor: '#050E1B' }}>
+      <View style={{ flex: 1, backgroundColor: '#020818' }}>
         <StatusBar style="light" />
         {/* Tap outside to close */}
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose}/>
 
         <View style={ms.sheet}>
           <LinearGradient
-            colors={['#0C1A30', '#050E1B']}
+            colors={['#030B1E', '#020818']}
             style={StyleSheet.absoluteFillObject}
           />
           {/* Blue glow accent at top */}
@@ -157,8 +159,8 @@ const StaffProfileModal = memo(function StaffProfileModal({
 
           <ScrollView
             showsVerticalScrollIndicator={false}
-            style={{ flex: 1, backgroundColor: '#050E1B' }}
-            contentContainerStyle={{ flexGrow: 1, backgroundColor: '#050E1B', paddingBottom: 60 }}
+            style={{ flex: 1, backgroundColor: '#020818' }}
+            contentContainerStyle={{ flexGrow: 1, backgroundColor: '#020818', paddingBottom: 60 }}
             bounces={false}
           >
             {/* Close button */}
@@ -171,12 +173,12 @@ const StaffProfileModal = memo(function StaffProfileModal({
               {staff.avatar_url && !imgErr ? (
                 <Image
                   source={{ uri: staff.avatar_url }}
-                  style={{ width: 80, height: 80, borderRadius: 40, borderWidth: 2, borderColor: BLUE }}
+                  style={{ width: 80, height: 80, borderRadius: 40, borderWidth: 2, borderColor: 'rgba(255,255,255,0.25)' }}
                   resizeMode="cover"
                   onError={() => setImgErr(true)}
                 />
               ) : (
-                <View style={{ borderWidth: 2, borderColor: BLUE, borderRadius: 44, padding: 2 }}>
+                <View style={{ borderWidth: 2, borderColor: 'rgba(255,255,255,0.25)', borderRadius: 44, padding: 2 }}>
                   <Avatar name={staff.display_name} size={80} bg="rgba(255,255,255,0.06)"/>
                 </View>
               )}
@@ -194,8 +196,8 @@ const StaffProfileModal = memo(function StaffProfileModal({
                   borderWidth: 1,
                   borderColor: isAvailable ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.1)',
                 }}>
-                  <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: isAvailable ? SUCCESS : MUTED }}/>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: isAvailable ? SUCCESS : MUTED }}>
+                  <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: isAvailable ? '#FFFFFF' : MUTED }}/>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: isAvailable ? '#FFFFFF' : MUTED }}>
                     {isAvailable ? 'Disponible' : 'Indisponible'}
                   </Text>
                 </View>
@@ -214,7 +216,7 @@ const StaffProfileModal = memo(function StaffProfileModal({
                     backgroundColor: 'rgba(255,255,255,0.05)',
                     borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
                   }}>
-                    <Text style={{ color: BLUE, fontSize: 12, fontWeight: '600' }}>{r}</Text>
+                    <Text style={{ color: WHITE, fontSize: 12, fontWeight: '600' }}>{r}</Text>
                   </View>
                 ))}
               </View>
@@ -253,36 +255,51 @@ const StaffProfileModal = memo(function StaffProfileModal({
             ) : null}
 
             {/* CTA buttons */}
-            <View style={{ flexDirection: 'row', gap: 12, paddingHorizontal: EDGE, marginTop: 24 }}>
-              {/* Message — outlined */}
+            <View style={{ gap: 10, paddingHorizontal: EDGE, marginTop: 24 }}>
+              {/* WhatsApp */}
               <TouchableOpacity
                 style={{
-                  flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  paddingVertical: 14, borderRadius: 14,
-                  borderWidth: 1.5, borderColor: BLUE,
-                  backgroundColor: 'rgba(26,159,227,0.07)',
+                  flexDirection: 'row', gap: 8, padding: 14, borderRadius: 14,
+                  backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+                  alignItems: 'center', justifyContent: 'center',
                 }}
                 activeOpacity={0.8}
                 onPress={onClose}
               >
-                <Ionicons name="mail-outline" size={16} color={BLUE}/>
-                <Text style={{ color: BLUE, fontSize: 14, fontWeight: '700' }}>Message</Text>
+                <Ionicons name="logo-whatsapp" size={18} color="#FFFFFF" />
+                <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '600' }}>Envoyer un message WhatsApp</Text>
               </TouchableOpacity>
 
-              {/* Invite — filled */}
-              <TouchableOpacity
-                style={{
-                  flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  paddingVertical: 14, borderRadius: 14,
-                  backgroundColor: BLUE,
-                  shadowColor: BLUE, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 10, elevation: 6,
-                }}
-                activeOpacity={0.82}
-                onPress={onClose}
-              >
-                <Ionicons name="calendar-outline" size={16} color={BG}/>
-                <Text style={{ color: BG, fontSize: 14, fontWeight: '800' }}>Inviter à un événement</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                {/* Message — outlined */}
+                <TouchableOpacity
+                  style={{
+                    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    paddingVertical: 14, borderRadius: 14,
+                    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.25)',
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                  }}
+                  activeOpacity={0.8}
+                  onPress={onClose}
+                >
+                  <Ionicons name="mail-outline" size={16} color={WHITE}/>
+                  <Text style={{ color: WHITE, fontSize: 14, fontWeight: '700' }}>Message</Text>
+                </TouchableOpacity>
+
+                {/* Invite — filled */}
+                <TouchableOpacity
+                  style={{
+                    flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    paddingVertical: 14, borderRadius: 14,
+                    backgroundColor: '#FFFFFF',
+                  }}
+                  activeOpacity={0.82}
+                  onPress={onClose}
+                >
+                  <Ionicons name="calendar-outline" size={16} color={BG}/>
+                  <Text style={{ color: BG, fontSize: 14, fontWeight: '800' }}>Inviter à un événement</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </ScrollView>
 
@@ -296,16 +313,16 @@ const StaffProfileModal = memo(function StaffProfileModal({
 
 const ms = StyleSheet.create({
   overlay    : { flex: 1, backgroundColor: 'rgba(5,14,27,0.85)', justifyContent: 'flex-end' },
-  sheet      : { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden', maxHeight: '90%', backgroundColor: NAVY },
+  sheet      : { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden', maxHeight: '90%', backgroundColor: '#030B1E' },
   closeBtn   : { position: 'absolute', top: 16, right: 18, zIndex: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: FAINT, alignItems: 'center', justifyContent: 'center' },
   statsRow   : { flexDirection: 'row', marginHorizontal: EDGE, borderRadius: 16, backgroundColor: FAINT, paddingVertical: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)' },
   statItem   : { flex: 1, alignItems: 'center', gap: 4 },
   statValue  : { fontSize: 20, fontWeight: '800', color: WHITE },
-  statLabel  : { fontSize: 11, color: MUTED, fontWeight: '500' },
+  statLabel  : { fontSize: 11, color: WHITE, fontWeight: '500' },
   statDivider: { width: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.10)' },
   bioBox     : { marginHorizontal: EDGE, marginTop: 20, padding: 16, borderRadius: 14, backgroundColor: FAINT, borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)', gap: 8 },
-  bioLabel   : { fontSize: 11, fontWeight: '700', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8 },
-  bioText    : { fontSize: 13, color: 'rgba(255,255,255,0.88)', lineHeight: 20 },
+  bioLabel   : { fontSize: 11, fontWeight: '700', color: WHITE, textTransform: 'uppercase', letterSpacing: 0.8 },
+  bioText    : { fontSize: 13, color: '#FFFFFF', lineHeight: 20 },
 });
 
 /* ─── Staff Card (available) ─────────────────────────────────────────────── */
@@ -342,7 +359,7 @@ const StaffCard = memo(function StaffCard({ staff, index, onPress }: {
         onPressOut={() => Animated.spring(press, { toValue: 1,    useNativeDriver: true, tension: 300, friction: 10 }).start()}
         activeOpacity={1}
       >
-        <LinearGradient colors={[`${BLUE}0B`, `${BLUE}03`]} style={StyleSheet.absoluteFillObject}/>
+        <LinearGradient colors={['rgba(255,255,255,0.04)', 'rgba(255,255,255,0.01)']} style={StyleSheet.absoluteFillObject}/>
 
         <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
           {/* Avatar */}
@@ -361,7 +378,7 @@ const StaffCard = memo(function StaffCard({ staff, index, onPress }: {
             {/* Name + availability dot */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Text style={[sc.name, { color: WHITE }]} numberOfLines={1}>{staff.display_name}</Text>
-              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isAvailable ? SUCCESS : MUTED }}/>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isAvailable ? '#FFFFFF' : MUTED }}/>
             </View>
 
             {/* Stars */}
@@ -369,10 +386,10 @@ const StaffCard = memo(function StaffCard({ staff, index, onPress }: {
 
             {/* Role chips */}
             {roles.length > 0 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ backgroundColor: '#050E1B', flexGrow: 1, gap: 5, flexDirection: 'row' }} style={{ backgroundColor: '#050E1B' }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ backgroundColor: '#020818', flexGrow: 1, gap: 5, flexDirection: 'row' }} style={{ backgroundColor: '#020818' }}>
                 {roles.slice(0, 3).map((r, i) => (
                   <View key={i} style={[sc.tag, { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: T.borderHi }]}>
-                    <Text style={[sc.tagTxt, { color: BLUE }]}>{r}</Text>
+                    <Text style={[sc.tagTxt, { color: WHITE }]}>{r}</Text>
                   </View>
                 ))}
               </ScrollView>
@@ -383,13 +400,13 @@ const StaffCard = memo(function StaffCard({ staff, index, onPress }: {
               {staff.missions_count != null && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Ionicons name="briefcase-outline" size={11} color={MUTED}/>
-                  <Text style={{ fontSize: 11, color: MUTED }}>{staff.missions_count} missions</Text>
+                  <Text style={{ fontSize: 11, color: WHITE }}>{staff.missions_count} missions</Text>
                 </View>
               )}
               {staff.experience_years != null && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Ionicons name="time-outline" size={11} color={MUTED}/>
-                  <Text style={{ fontSize: 11, color: MUTED }}>{staff.experience_years} ans exp.</Text>
+                  <Text style={{ fontSize: 11, color: WHITE }}>{staff.experience_years} ans exp.</Text>
                 </View>
               )}
               {staff.hourly_rate != null && (
@@ -408,7 +425,7 @@ const StaffCard = memo(function StaffCard({ staff, index, onPress }: {
 
         {/* Bio preview */}
         {staff.bio ? (
-          <Text style={[sc.bio, { color: T.offWhite, borderTopColor: T.border }]} numberOfLines={2}>
+          <Text style={[sc.bio, { color: T.white, borderTopColor: T.border }]} numberOfLines={2}>
             {staff.bio}
           </Text>
         ) : null}
@@ -421,15 +438,15 @@ const StaffCard = memo(function StaffCard({ staff, index, onPress }: {
 
 const sc = StyleSheet.create({
   card      : { borderRadius: 14, padding: 14, gap: 10, borderWidth: 1, overflow: 'hidden',
-                shadowColor: BLUE, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 2 },
+                shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.20, shadowRadius: 6, elevation: 2 },
   avatar    : { width: 52, height: 52, borderRadius: 26, flexShrink: 0 },
   name      : { fontSize: 15, fontWeight: '700', flex: 1 },
   tag       : { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1 },
   tagTxt    : { fontSize: 10, fontWeight: '600' },
   bio       : { fontSize: 12, lineHeight: 17, borderTopWidth: 1, paddingTop: 8 },
-  recruitBtn: { backgroundColor: BLUE, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8,
-                shadowColor: BLUE, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.35, shadowRadius: 6, elevation: 4 },
-  recruitTxt: { color: BG, fontSize: 11, fontWeight: '800' },
+  recruitBtn: { backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8,
+                borderWidth: 1, borderColor: 'rgba(255,255,255,0.20)' },
+  recruitTxt: { color: WHITE, fontSize: 11, fontWeight: '800' },
 });
 
 /* ─── Engaged Staff Card ─────────────────────────────────────────────────── */
@@ -447,7 +464,7 @@ const EngagedCard = memo(function EngagedCard({ staff, index, onPress }: {
   }, []);
 
   const missionStatus   = staff.mission_status;
-  const statusColor     = missionStatus === 'paid' ? SUCCESS : missionStatus === 'pending' ? WARNING : BLUE;
+  const statusColor     = missionStatus === 'paid' ? '#FFFFFF' : missionStatus === 'pending' ? WARNING : 'rgba(255,255,255,0.80)';
   const statusLabel     = missionStatus === 'paid' ? 'Payé' : missionStatus === 'pending' ? 'En attente' : 'En cours';
 
   return (
@@ -461,7 +478,7 @@ const EngagedCard = memo(function EngagedCard({ staff, index, onPress }: {
         activeOpacity={0.85}
         onPress={onPress}
       >
-        <LinearGradient colors={[`${BLUE}0B`, `${BLUE}03`]} style={StyleSheet.absoluteFillObject}/>
+        <LinearGradient colors={['rgba(255,255,255,0.04)', 'rgba(255,255,255,0.01)']} style={StyleSheet.absoluteFillObject}/>
         <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
           {staff.avatar_url && !imgErr ? (
             <Image source={{ uri: staff.avatar_url }} style={ec.avatar} resizeMode="cover" onError={() => setImgErr(true)}/>
@@ -470,8 +487,8 @@ const EngagedCard = memo(function EngagedCard({ staff, index, onPress }: {
           )}
           <View style={{ flex: 1, gap: 3 }}>
             <Text style={[ec.name, { color: WHITE }]} numberOfLines={1}>{staff.display_name}</Text>
-            <Text style={{ color: BLUE, fontSize: 11, fontWeight: '600' }}>{staff.role_title}</Text>
-            <Text style={{ color: T.offWhite, fontSize: 11 }} numberOfLines={1}>{staff.event_title}</Text>
+            <Text style={{ color: WHITE, fontSize: 11, fontWeight: '600' }}>{staff.role_title}</Text>
+            <Text style={{ color: T.white, fontSize: 11 }} numberOfLines={1}>{staff.event_title}</Text>
           </View>
           <View style={{ alignItems: 'flex-end', gap: 4 }}>
             <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: `${statusColor}12` }}>
@@ -488,7 +505,7 @@ const EngagedCard = memo(function EngagedCard({ staff, index, onPress }: {
 
 const ec = StyleSheet.create({
   card  : { borderRadius: 14, padding: 14, borderWidth: 1,
-            shadowColor: BLUE, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
+            shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 2 },
   avatar: { width: 46, height: 46, borderRadius: 23, flexShrink: 0 },
   name  : { fontSize: 14, fontWeight: '700' },
 });
@@ -547,6 +564,7 @@ export default function StaffScreen() {
       const { data: staffData } = await supabase
         .from('staff')
         .select('id,display_name,avatar_url,role,rating,missions_count,experience_years,bio,hourly_rate,is_available')
+        .in('display_name', ['Arik', 'Oka', 'Redo'])
         .order('rating', { ascending: false })
         .limit(50);
       setAvailableStaff((staffData ?? []) as StaffRow[]);
@@ -657,7 +675,7 @@ export default function StaffScreen() {
   }, [engagedStaff, search]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: BG }}>
+    <View style={{ flex: 1, backgroundColor: '#020818' }}>
       <ParticleBg/>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
 
@@ -666,17 +684,15 @@ export default function StaffScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <View>
               <Text style={{ fontSize: 22, fontWeight: '800', color: WHITE }}>Staffs</Text>
-              <Text style={{ fontSize: 12, color: T.offWhite, marginTop: 2 }}>
+              <Text style={{ fontSize: 12, color: T.white, marginTop: 2 }}>
                 {availableStaff.length} disponibles · {engagedStaff.length} engagés
               </Text>
             </View>
             <TouchableOpacity
               style={{
-                backgroundColor: BLUE,
+                backgroundColor: '#FFFFFF',
                 flexDirection: 'row', alignItems: 'center', gap: 6,
                 paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12,
-                shadowColor: BLUE, shadowOffset: { width: 0, height: 3 },
-                shadowOpacity: 0.35, shadowRadius: 8, elevation: 5,
               }}
               onPress={() => router.push('/(organizer)/applications' as never)}
               activeOpacity={0.82}
@@ -690,10 +706,10 @@ export default function StaffScreen() {
           <View style={[
             { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1 },
             searchFocus
-              ? { borderColor: T.borderHi, backgroundColor: 'rgba(26,159,227,0.07)' }
+              ? { borderColor: T.borderHi, backgroundColor: 'rgba(255,255,255,0.08)' }
               : { borderColor: T.border, backgroundColor: T.surf },
           ]}>
-            <Ionicons name="search-outline" size={16} color={searchFocus ? BLUE : MUTED}/>
+            <Ionicons name="search-outline" size={16} color={searchFocus ? WHITE : MUTED}/>
             <TextInput
               style={{ flex: 1, fontSize: 14, color: WHITE, padding: 0 }}
               placeholder="Rechercher un staff..."
@@ -747,7 +763,7 @@ export default function StaffScreen() {
                     borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1,
                     backgroundColor: tab === key ? 'rgba(255,255,255,0.05)' : T.surf,
                   }}>
-                    <Text style={{ fontSize: 10, fontWeight: '700', color: tab === key ? BLUE : MUTED }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: tab === key ? WHITE : MUTED }}>
                       {count}
                     </Text>
                   </View>
@@ -760,13 +776,13 @@ export default function StaffScreen() {
         {/* ── LIST ── */}
         <ScrollView
           showsVerticalScrollIndicator={false}
-          style={{ flex: 1, backgroundColor: '#050E1B' }}
-          contentContainerStyle={{ backgroundColor: '#050E1B', flexGrow: 1, paddingHorizontal: EDGE, paddingBottom: 120, paddingTop: 4 }}
+          style={{ flex: 1, backgroundColor: '#020818' }}
+          contentContainerStyle={{ backgroundColor: '#020818', flexGrow: 1, paddingHorizontal: EDGE, paddingBottom: 120, paddingTop: 4 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => { setRefreshing(true); load(true); }}
-              tintColor={BLUE}
+              tintColor={WHITE}
             />
           }
         >
@@ -779,12 +795,12 @@ export default function StaffScreen() {
                   alignItems: 'center', justifyContent: 'center',
                   borderWidth: 1, borderColor: T.border,
                 }}>
-                  <Ionicons name="people-outline" size={32} color={BLUE}/>
+                  <Ionicons name="people-outline" size={32} color={WHITE}/>
                 </View>
                 <Text style={{ fontSize: 17, fontWeight: '700', color: WHITE }}>
                   {search ? 'Aucun résultat' : tab === 'available' ? 'Aucun staff disponible' : 'Aucun staff engagé'}
                 </Text>
-                <Text style={{ color: T.offWhite, fontSize: 13, textAlign: 'center', lineHeight: 19 }}>
+                <Text style={{ color: T.white, fontSize: 13, textAlign: 'center', lineHeight: 19 }}>
                   {search
                     ? `Aucun résultat pour "${search}"`
                     : tab === 'available'

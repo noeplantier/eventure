@@ -1,298 +1,604 @@
-import React, { useState } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator, KeyboardAvoidingView,
-  Platform, ScrollView,
+  Animated,
+  Dimensions,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons }       from '@expo/vector-icons';
-import { useRouter }      from 'expo-router';
-import { SafeAreaView }   from 'react-native-safe-area-context';
-import { supabase }       from '@/lib/supabase';
+import { BlurView }                from 'expo-blur';
+import { LinearGradient }          from 'expo-linear-gradient';
+import { Ionicons }                from '@expo/vector-icons';
+import { useSafeAreaInsets }       from 'react-native-safe-area-context';
+import { StatusBar }               from 'expo-status-bar';
+import { useRouter }               from 'expo-router';
+import { PUT_IN_COFFEE_USERS, AppUser } from '@/lib/putInCoffeeUsers';
+import { useAuth }                 from '@/lib/authContext';
 
-const GREEN = '#00D97E';
-const T = {
-  bg:     '#020A06',
-  navy:   '#0A2218',
-  white:  '#FFFFFF',
-  muted:  'rgba(255,255,255,0.50)',
-  faint:  'rgba(255,255,255,0.18)',
-  surf:   'rgba(255,255,255,0.06)',
-  border: 'rgba(0,217,126,0.18)',
-  green:  GREEN,
-  gold:   '#F5C842',
-  red:    '#EF4444',
-};
+// ─── Constants ───────────────────────────────────────────────────────────────
+const { width: SW, height: SH } = Dimensions.get('window');
+const BG = '#020818';
+const PCOLS = [
+  'rgba(255,255,255,0.20)',
+  'rgba(255,255,255,0.10)',
+  'rgba(255,255,255,0.15)',
+  'rgba(255,255,255,0.08)',
+  'rgba(255,255,255,0.05)',
+];
 
-export default function WelcomeScreen() {
-  const router = useRouter();
+// ─── Pre-computed particles ───────────────────────────────────────────────────
+const PARTICLES = Array.from({ length: 20 }, (_, i) => ({
+  key  : i,
+  x    : ((Math.sin(i * 2.399) + 1) / 2) * SW,
+  y    : ((Math.cos(i * 1.618) + 1) / 2) * SH,
+  r    : i % 5 === 0 ? 2.4 : i % 3 === 0 ? 1.4 : 0.8,
+  col  : PCOLS[i % PCOLS.length],
+  delay: i * 180,
+  dur  : 2800 + (i % 4) * 600,
+}));
 
-  const [mode,     setMode]     = useState<'login'|'register'>('login');
-  const [email,    setEmail]    = useState('');
-  const [password, setPassword] = useState('');
-  const [company,  setCompany]  = useState('');
-  const [loading,  setLoading]  = useState(false);
-  const [showPass, setShowPass] = useState(false);
-  const [error,    setError]    = useState('');
+// ─── Animated particle dot ────────────────────────────────────────────────────
+const ParticleDot = memo(function ParticleDot({
+  x, y, r, col, delay, dur,
+}: (typeof PARTICLES)[0]) {
+  const anim = useRef(new Animated.Value(0)).current;
 
-  const handle = async () => {
-    setError('');
-    if (!email.trim() || !password.trim()) {
-      setError('Email et mot de passe requis'); return;
-    }
-    if (mode === 'register' && !company.trim()) {
-      setError('Nom de votre agence / société requis'); return;
-    }
-    if (password.length < 6) {
-      setError('Mot de passe trop court (6 caractères min)'); return;
-    }
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.timing(anim, { toValue: 1, duration: dur, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0, duration: dur, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [anim, delay, dur]);
 
-    setLoading(true);
-    try {
-      if (mode === 'login') {
-        const { error: e } = await supabase.auth.signInWithPassword({
-          email: email.trim(), password,
-        });
-        if (e) { setError(e.message); return; }
-        router.replace('/(organizer)/dashboard');
-
-      } else {
-        const { data, error: e } = await supabase.auth.signUp({
-          email: email.trim(), password,
-        });
-        if (e) { setError(e.message); return; }
-
-        // Créer le profil organisateur
-        if (data.user) {
-          await supabase.from('profiles').upsert({
-            id:           data.user.id,
-            email:        email.trim(),
-            display_name: company.trim(),
-            company_name: company.trim(),
-            role:         'organizer',
-            is_pro:       false,
-            verified:     false,
-          });
-        }
-
-        // Si confirmation email requise
-        if (!data.session) {
-          Alert.alert(
-            'Vérifiez votre email 📬',
-            `Un lien de confirmation a été envoyé à ${email.trim()}. Cliquez dessus pour activer votre compte.`,
-            [{ text: 'OK' }]
-          );
-          return;
-        }
-        router.replace('/(organizer)/dashboard');
-      }
-    } catch (err: any) {
-      setError(err?.message ?? 'Une erreur est survenue');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const opacity = anim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.08, 0.55, 0.08] });
+  const scale   = anim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.6, 1.4, 0.6] });
 
   return (
-    <View style={s.root}>
-      <LinearGradient colors={['#020A06','#051A0E','#020A06']} style={StyleSheet.absoluteFill}/>
+    <Animated.View
+      style={{
+        position       : 'absolute',
+        left           : x - r,
+        top            : y - r,
+        width          : r * 2,
+        height         : r * 2,
+        borderRadius   : r,
+        backgroundColor: col,
+        opacity,
+        transform      : [{ scale }],
+      }}
+      pointerEvents="none"
+    />
+  );
+});
 
-      {/* Halo vert */}
-      <View style={s.halo}/>
+// ─── Particle Background ──────────────────────────────────────────────────────
+const ParticleBg = memo(function ParticleBg() {
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <LinearGradient
+        colors={['#010610', '#020818', '#030B1E', '#041232', '#020818', '#010610']}
+        locations={[0, 0.2, 0.4, 0.6, 0.8, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+      {/* Ambient halos */}
+      <View style={{
+        position: 'absolute', top: SH * 0.05, left: -SW * 0.3,
+        width: SW * 1.6, height: SH * 0.4, borderRadius: SW,
+        backgroundColor: 'rgba(255,255,255,0.015)',
+      }} />
+      <View style={{
+        position: 'absolute', bottom: SH * 0.1, right: -SW * 0.2,
+        width: SW * 0.9, height: SW * 0.9, borderRadius: SW * 0.45,
+        backgroundColor: 'rgba(255,255,255,0.008)',
+      }} />
+      {PARTICLES.map(({ key, ...p }) => <ParticleDot key={key} {...p} />)}
+    </View>
+  );
+});
 
-      <KeyboardAvoidingView
-        style={{ flex:1 }}
-        behavior={Platform.OS==='ios'?'padding':'height'}
+// ─── User Card ────────────────────────────────────────────────────────────────
+interface UserCardProps {
+  user    : AppUser;
+  onPress : (u: AppUser) => void;
+}
+
+const UserCard = memo(function UserCard({ user, onPress }: UserCardProps) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () =>
+    Animated.spring(scaleAnim, { toValue: 0.97, useNativeDriver: true, speed: 40 }).start();
+  const onPressOut = () =>
+    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 20 }).start();
+
+  return (
+    <Animated.View style={{ transform: [{ scale: scaleAnim }], marginBottom: 14 }}>
+      <Pressable
+        onPress={() => onPress(user)}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        style={({ pressed }) => [{ opacity: pressed ? 0.92 : 1 }]}
       >
-        <ScrollView
-          contentContainerStyle={{ flexGrow:1 }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <SafeAreaView style={s.inner}>
+        <BlurView intensity={20} tint="systemUltraThinMaterialDark" style={{ borderRadius: 20, overflow: 'hidden' }}>
+          <View style={[cs.card, { borderColor: 'rgba(255,255,255,0.15)' }]}>
+            {/* Specular highlight */}
+            <LinearGradient
+              colors={['rgba(255,255,255,0.12)', 'transparent']}
+              style={cs.specular}
+            />
 
-            {/* Logo */}
-            <View style={s.hero}>
-              <View style={s.logoBox}>
-                <Ionicons name="calendar" size={40} color={GREEN}/>
-              </View>
-              <Text style={s.title}>Eventure</Text>
-              <Text style={s.sub}>Staffing Événementiel Professionnel</Text>
+            {/* Avatar */}
+            <View style={[cs.avatarRing, { borderColor: 'rgba(255,255,255,0.25)', backgroundColor: 'rgba(255,255,255,0.10)' }]}>
+              <Image
+                source={{ uri: user.avatarUrl }}
+                style={cs.avatar}
+              />
             </View>
 
-            {/* Tabs login / register */}
-            <View style={s.tabs}>
-              {(['login','register'] as const).map(m => (
-                <TouchableOpacity
-                  key={m}
-                  style={[s.tab, mode===m && s.tabActive]}
-                  onPress={()=>{ setMode(m); setError(''); }}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[s.tabTxt, mode===m && s.tabTxtActive]}>
-                    {m==='login' ? 'Se connecter' : 'Créer un compte'}
-                  </Text>
-                </TouchableOpacity>
+            {/* Info */}
+            <View style={cs.info}>
+              <Text style={cs.name}>{user.name}</Text>
+              <Text style={cs.title}>{user.title}</Text>
+              {/* Role badge */}
+              <View style={[cs.badge, { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.25)' }]}>
+                <Text style={[cs.badgeTxt, { color: '#FFFFFF' }]}>
+                  {user.role === 'organizer' ? 'Organisateur' : 'Staff'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Chevron */}
+            <Ionicons name="chevron-forward" size={20} color="#FFFFFF" style={{ opacity: 0.7 }} />
+          </View>
+        </BlurView>
+      </Pressable>
+    </Animated.View>
+  );
+});
+
+const cs = StyleSheet.create({
+  card: {
+    flexDirection  : 'row',
+    alignItems     : 'center',
+    gap            : 16,
+    padding        : 18,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius   : 20,
+    borderWidth    : 1.5,
+  },
+  specular: {
+    position           : 'absolute',
+    top                : 0, left: 0, right: 0,
+    height             : 40,
+    borderTopLeftRadius : 20,
+    borderTopRightRadius: 20,
+  },
+  avatarRing: {
+    width       : 64,
+    height      : 64,
+    borderRadius: 32,
+    borderWidth : 2,
+    alignItems  : 'center',
+    justifyContent: 'center',
+  },
+  avatar: {
+    width       : 60,
+    height      : 60,
+    borderRadius: 30,
+  },
+  info : { flex: 1, gap: 4 },
+  name : { color: '#FFFFFF', fontSize: 19, fontWeight: '800', letterSpacing: -0.4 },
+  title: { color: '#FFFFFF', fontSize: 13, fontWeight: '500' },
+  badge: {
+    alignSelf      : 'flex-start',
+    borderRadius   : 10,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderWidth    : 1,
+  },
+  badgeTxt: {
+    fontSize      : 10,
+    fontWeight    : '700',
+    textTransform : 'uppercase',
+    letterSpacing : 0.5,
+  },
+});
+
+// ─── PIN numpad ───────────────────────────────────────────────────────────────
+const NUMPAD_KEYS = ['1','2','3','4','5','6','7','8','9','del','0',''];
+
+interface PinPadProps {
+  selectedUser : AppUser;
+  onDigit      : (d: string) => void;
+  onDelete     : () => void;
+  pin          : string;
+  error        : boolean;
+  onClose      : () => void;
+  sheetAnim    : Animated.Value;
+}
+
+const PinPad = memo(function PinPad({
+  selectedUser, onDigit, onDelete, pin, error, onClose, sheetAnim,
+}: PinPadProps) {
+  const insets = useSafeAreaInsets();
+  const translateY = sheetAnim.interpolate({ inputRange: [0, 1], outputRange: [700, 0] });
+
+  return (
+    <>
+      {/* Backdrop */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose}>
+        <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+      </Pressable>
+
+      {/* Sheet */}
+      <Animated.View style={[pp.sheet, { transform: [{ translateY }] }]}>
+        <BlurView intensity={60} tint="systemUltraThinMaterialDark" style={{ borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden' }}>
+          <View style={[pp.inner, { paddingBottom: insets.bottom + 24 }]}>
+
+            {/* Handle */}
+            <View style={pp.handle} />
+
+            {/* User avatar mini */}
+            <View style={[pp.miniAvatar, { borderColor: 'rgba(255,255,255,0.25)', backgroundColor: 'rgba(255,255,255,0.10)' }]}>
+              <Image source={{ uri: selectedUser.avatarUrl }} style={pp.miniImg} />
+            </View>
+
+            {/* Header */}
+            <Text style={pp.greeting}>Bonjour {selectedUser.name}</Text>
+            <Text style={pp.subtitle}>Entrez votre code PIN</Text>
+
+            {/* 4 PIN dots */}
+            <View style={pp.dots}>
+              {[0, 1, 2, 3].map(i => (
+                <View
+                  key={i}
+                  style={[
+                    pp.dot,
+                    {
+                      backgroundColor: i < pin.length
+                        ? (error ? 'rgba(255,255,255,0.35)' : '#FFFFFF')
+                        : 'rgba(255,255,255,0.15)',
+                      borderColor: error
+                        ? 'rgba(255,255,255,0.35)'
+                        : i < pin.length
+                          ? 'rgba(255,255,255,0.80)'
+                          : 'rgba(255,255,255,0.25)',
+                    },
+                  ]}
+                />
               ))}
             </View>
 
-            {/* Formulaire */}
-            <View style={s.form}>
+            {/* Error hint */}
+            {error && (
+              <Text style={pp.errorTxt}>PIN incorrect</Text>
+            )}
 
-              {/* Nom agence — register uniquement */}
-              {mode==='register' && (
-                <View style={s.fieldWrap}>
-                  <Text style={s.label}>Nom de votre agence / société</Text>
-                  <View style={s.inputRow}>
-                    <Ionicons name="business-outline" size={16} color={T.muted}/>
-                    <TextInput
-                      style={s.input}
-                      placeholder="Ex : Événements Dupont SARL"
-                      placeholderTextColor={T.faint}
-                      value={company}
-                      onChangeText={setCompany}
-                      autoCapitalize="words"
-                      returnKeyType="next"
-                    />
-                  </View>
-                </View>
-              )}
-
-              {/* Email */}
-              <View style={s.fieldWrap}>
-                <Text style={s.label}>Adresse email</Text>
-                <View style={s.inputRow}>
-                  <Ionicons name="mail-outline" size={16} color={T.muted}/>
-                  <TextInput
-                    style={s.input}
-                    placeholder="votre@email.com"
-                    placeholderTextColor={T.faint}
-                    value={email}
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    returnKeyType="next"
-                  />
-                </View>
-              </View>
-
-              {/* Mot de passe */}
-              <View style={s.fieldWrap}>
-                <Text style={s.label}>Mot de passe</Text>
-                <View style={s.inputRow}>
-                  <Ionicons name="lock-closed-outline" size={16} color={T.muted}/>
-                  <TextInput
-                    style={[s.input, { flex:1 }]}
-                    placeholder={mode==='register'?'6 caractères minimum':'••••••••'}
-                    placeholderTextColor={T.faint}
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry={!showPass}
-                    returnKeyType="done"
-                    onSubmitEditing={handle}
-                  />
-                  <TouchableOpacity onPress={()=>setShowPass(p=>!p)} hitSlop={8}>
-                    <Ionicons
-                      name={showPass?'eye-off-outline':'eye-outline'}
-                      size={16} color={T.muted}
-                    />
+            {/* Numpad */}
+            <View style={pp.numpad}>
+              {NUMPAD_KEYS.map((key, idx) => {
+                if (key === '') {
+                  return <View key={idx} style={pp.keyEmpty} />;
+                }
+                if (key === 'del') {
+                  return (
+                    <TouchableOpacity
+                      key={idx}
+                      onPress={onDelete}
+                      style={pp.keyDel}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="backspace-outline" size={24} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  );
+                }
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    onPress={() => onDigit(key)}
+                    style={pp.key}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={pp.keyTxt}>{key}</Text>
                   </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Erreur */}
-              {!!error && (
-                <View style={s.errorBox}>
-                  <Ionicons name="alert-circle-outline" size={14} color={T.red}/>
-                  <Text style={s.errorTxt}>{error}</Text>
-                </View>
-              )}
-
-              {/* CTA */}
-              <TouchableOpacity
-                style={[s.cta, loading && { opacity:0.6 }]}
-                onPress={handle}
-                activeOpacity={0.85}
-                disabled={loading}
-              >
-                <LinearGradient
-                  colors={['rgba(0,217,126,0.35)','rgba(0,217,126,0.18)']}
-                  style={s.ctaGrad}
-                >
-                  {loading
-                    ? <ActivityIndicator color={GREEN} size="small"/>
-                    : <>
-                        <Text style={s.ctaTxt}>
-                          {mode==='login' ? 'Se connecter' : 'Créer mon compte'}
-                        </Text>
-                        <Ionicons name="arrow-forward" size={16} color={GREEN}/>
-                      </>
-                  }
-                </LinearGradient>
-              </TouchableOpacity>
-
-              {/* Mot de passe oublié */}
-              {mode==='login' && (
-                <TouchableOpacity style={{ alignSelf:'center', paddingVertical:8 }}
-                  onPress={async()=>{
-                    if(!email.trim()){setError('Entrez votre email d\'abord');return;}
-                    const {error:e} = await supabase.auth.resetPasswordForEmail(email.trim());
-                    if(e){setError(e.message);}
-                    else{Alert.alert('Email envoyé','Vérifiez votre boîte mail pour réinitialiser votre mot de passe.');}
-                  }}
-                >
-                  <Text style={s.forgotTxt}>Mot de passe oublié ?</Text>
-                </TouchableOpacity>
-              )}
+                );
+              })}
             </View>
 
-            {/* Footer */}
-            <View style={s.footer}>
-              <Text style={s.footerTxt}>
-                {mode==='login'
-                  ? "Pas encore de compte ? "
-                  : "Déjà un compte ? "}
-              </Text>
-              <TouchableOpacity onPress={()=>{ setMode(m=>m==='login'?'register':'login'); setError(''); }}>
-                <Text style={s.footerLink}>
-                  {mode==='login' ? 'Créer un compte' : 'Se connecter'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+          </View>
+        </BlurView>
+      </Animated.View>
+    </>
+  );
+});
 
-          </SafeAreaView>
-        </ScrollView>
-      </KeyboardAvoidingView>
+const pp = StyleSheet.create({
+  sheet  : { position: 'absolute', bottom: 0, left: 0, right: 0 },
+  inner  : {
+    backgroundColor    : 'rgba(5,12,35,0.88)',
+    borderTopLeftRadius : 28,
+    borderTopRightRadius: 28,
+    padding            : 28,
+    alignItems         : 'center',
+  },
+  handle  : {
+    width: 40, height: 4,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 2,
+    marginBottom: 22,
+  },
+  miniAvatar: {
+    width: 62, height: 62, borderRadius: 31,
+    borderWidth: 2,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 14,
+  },
+  miniImg   : { width: 58, height: 58, borderRadius: 29 },
+  greeting  : { color: '#FFFFFF', fontSize: 22, fontWeight: '800', textAlign: 'center', marginBottom: 4 },
+  subtitle  : { color: '#FFFFFF', fontSize: 14, textAlign: 'center', marginBottom: 28, fontWeight: '400' },
+  dots      : { flexDirection: 'row', justifyContent: 'center', gap: 16, marginBottom: 10 },
+  dot       : { width: 18, height: 18, borderRadius: 9, borderWidth: 1.5 },
+  errorTxt  : { color: 'rgba(255,255,255,0.70)', fontSize: 13, fontWeight: '600', marginBottom: 10 },
+  numpad    : { flexDirection: 'row', flexWrap: 'wrap', gap: 14, justifyContent: 'center', marginTop: 16 },
+  key       : {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  keyDel    : {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  keyEmpty  : { width: 80, height: 80 },
+  keyTxt    : { color: '#FFFFFF', fontSize: 28, fontWeight: '300' },
+});
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
+export default function WelcomeScreen() {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { login } = useAuth();
+
+  const [selectedUser, setSelectedUser] = useState<AppUser | null>(null);
+  const [pin, setPin]                   = useState('');
+  const [error, setError]               = useState(false);
+  const sheetAnim                       = useRef(new Animated.Value(0)).current;
+
+  // Header fade-in on mount
+  const headerAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(headerAnim, {
+      toValue : 1,
+      duration: 900,
+      delay   : 200,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  const openSheet = useCallback((u: AppUser) => {
+    setSelectedUser(u);
+    setPin('');
+    setError(false);
+    Animated.spring(sheetAnim, {
+      toValue   : 1,
+      useNativeDriver: true,
+      damping   : 20,
+      stiffness : 200,
+    }).start();
+  }, [sheetAnim]);
+
+  const closeSheet = useCallback(() => {
+    Animated.spring(sheetAnim, { toValue: 0, useNativeDriver: true }).start(() => {
+      setSelectedUser(null);
+      setPin('');
+    });
+  }, [sheetAnim]);
+
+  const addDigit = useCallback((d: string) => {
+    setPin(prev => {
+      if (prev.length >= 4) return prev;
+      const next = prev + d;
+      if (next.length === 4) {
+        // Check PIN after state settles
+        setTimeout(() => {
+          setPin(cur => {
+            if (cur !== next) return cur; // already reset
+            return cur;
+          });
+          if (next === selectedUser?.pin) {
+            closeSheet();
+            login(selectedUser!).then(() => {
+              router.replace(
+                selectedUser!.role === 'organizer'
+                  ? '/(organizer)/dashboard'
+                  : '/(staff)/feed',
+              );
+            });
+          } else {
+            setError(true);
+            setTimeout(() => { setPin(''); setError(false); }, 700);
+          }
+        }, 0);
+      }
+      return next;
+    });
+  }, [selectedUser, closeSheet, login, router]);
+
+  // We need synchronous access to selectedUser in addDigit — use ref
+  const selectedUserRef = useRef<AppUser | null>(null);
+  useEffect(() => { selectedUserRef.current = selectedUser; }, [selectedUser]);
+
+  const handleDigit = useCallback((d: string) => {
+    setPin(prev => {
+      if (prev.length >= 4) return prev;
+      const next = prev + d;
+      if (next.length === 4) {
+        const su = selectedUserRef.current;
+        if (next === su?.pin) {
+          // Correct PIN
+          setTimeout(() => {
+            closeSheet();
+            login(su!).then(() => {
+              router.replace(
+                su!.role === 'organizer'
+                  ? '/(organizer)/dashboard'
+                  : '/(staff)/feed',
+              );
+            });
+          }, 120);
+        } else {
+          // Wrong PIN
+          setTimeout(() => {
+            setError(true);
+            setTimeout(() => { setPin(''); setError(false); }, 700);
+          }, 60);
+        }
+      }
+      return next;
+    });
+  }, [closeSheet, login, router]);
+
+  const delDigit = useCallback(() => setPin(p => p.slice(0, -1)), []);
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#020818' }}>
+      <StatusBar style="light" />
+
+      {/* Animated background */}
+      <ParticleBg />
+
+      <ScrollView
+        contentContainerStyle={[
+          sc.scroll,
+          { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 120 },
+        ]}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={!selectedUser}
+      >
+        {/* ── Header ── */}
+        <Animated.View style={[sc.header, { opacity: headerAnim }]}>
+          {/* Logo icon */}
+          <View style={sc.logoBox}>
+            <LinearGradient
+              colors={['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.04)']}
+              style={StyleSheet.absoluteFill}
+            />
+            <Ionicons name="cafe-outline" size={32} color="#FFFFFF" />
+          </View>
+
+          <Text style={sc.wordmark}>PUT.IN COFFEE</Text>
+          <Text style={sc.location}>Sanur · Bali</Text>
+
+          {/* Indigo separator */}
+          <View style={sc.separator} />
+
+          <Text style={sc.choose}>Choisissez votre profil</Text>
+        </Animated.View>
+
+        {/* ── User cards ── */}
+        <View style={sc.cards}>
+          {PUT_IN_COFFEE_USERS.map(u => (
+            <UserCard key={u.id} user={u} onPress={openSheet} />
+          ))}
+        </View>
+
+        {/* Bottom hint */}
+        <View style={sc.hintRow}>
+          <Ionicons name="lock-closed-outline" size={12} color="rgba(255,255,255,0.35)" />
+          <Text style={sc.hint}>Accès sécurisé par code PIN</Text>
+        </View>
+      </ScrollView>
+
+      {/* ── PIN Sheet (overlay) ── */}
+      {selectedUser && (
+        <PinPad
+          selectedUser={selectedUser}
+          onDigit={handleDigit}
+          onDelete={delDigit}
+          pin={pin}
+          error={error}
+          onClose={closeSheet}
+          sheetAnim={sheetAnim}
+        />
+      )}
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  root:        { flex:1, backgroundColor:T.bg },
-  halo:        { position:'absolute', top:'8%', left:'-20%', width:'140%', height:'40%', borderRadius:999, backgroundColor:'rgba(0,217,126,0.04)' },
-  inner:       { flex:1, paddingHorizontal:24, justifyContent:'space-between', paddingTop:20, paddingBottom:32 },
-  hero:        { alignItems:'center', gap:12, paddingTop:20, paddingBottom:28 },
-  logoBox:     { width:80, height:80, borderRadius:24, backgroundColor:'rgba(0,217,126,0.12)', alignItems:'center', justifyContent:'center', borderWidth:1.5, borderColor:'rgba(0,217,126,0.28)' },
-  title:       { color:T.white, fontSize:34, fontWeight:'900', letterSpacing:-1 },
-  sub:         { color:T.muted, fontSize:13, textAlign:'center' },
-  tabs:        { flexDirection:'row', backgroundColor:T.surf, borderRadius:16, padding:4, marginBottom:24, borderWidth:StyleSheet.hairlineWidth, borderColor:T.border },
-  tab:         { flex:1, paddingVertical:11, borderRadius:12, alignItems:'center' },
-  tabActive:   { backgroundColor:'rgba(0,217,126,0.18)', borderWidth:1, borderColor:'rgba(0,217,126,0.30)' },
-  tabTxt:      { color:T.muted, fontSize:13, fontWeight:'600' },
-  tabTxtActive:{ color:GREEN, fontWeight:'800' },
-  form:        { gap:16 },
-  fieldWrap:   { gap:6 },
-  label:       { color:T.muted, fontSize:11, fontWeight:'700', letterSpacing:0.5, textTransform:'uppercase' },
-  inputRow:    { flexDirection:'row', alignItems:'center', gap:10, backgroundColor:T.surf, borderRadius:14, borderWidth:StyleSheet.hairlineWidth, borderColor:T.border, paddingHorizontal:14, paddingVertical:14 },
-  input:       { flex:1, color:T.white, fontSize:15 },
-  errorBox:    { flexDirection:'row', alignItems:'center', gap:8, backgroundColor:'rgba(239,68,68,0.10)', borderRadius:12, padding:12, borderWidth:1, borderColor:'rgba(239,68,68,0.25)' },
-  errorTxt:    { color:T.red, fontSize:12, fontWeight:'600', flex:1 },
-  cta:         { borderRadius:16, overflow:'hidden', borderWidth:1.5, borderColor:'rgba(0,217,126,0.40)' },
-  ctaGrad:     { flexDirection:'row', alignItems:'center', justifyContent:'center', gap:10, paddingVertical:16 },
-  ctaTxt:      { color:GREEN, fontSize:16, fontWeight:'900' },
-  forgotTxt:   { color:T.muted, fontSize:13, fontWeight:'600', textDecorationLine:'underline' },
-  footer:      { flexDirection:'row', justifyContent:'center', alignItems:'center', gap:4, paddingTop:8 },
-  footerTxt:   { color:T.muted, fontSize:13 },
-  footerLink:  { color:GREEN, fontSize:13, fontWeight:'700' },
+const sc = StyleSheet.create({
+  scroll: {
+    paddingHorizontal: 20,
+    flexGrow          : 1,
+  },
+  header: {
+    alignItems    : 'center',
+    marginBottom  : 36,
+    paddingTop    : 12,
+  },
+  logoBox: {
+    width         : 72,
+    height        : 72,
+    borderRadius  : 22,
+    alignItems    : 'center',
+    justifyContent: 'center',
+    borderWidth   : 1.5,
+    borderColor   : 'rgba(255,255,255,0.15)',
+    overflow      : 'hidden',
+    marginBottom  : 16,
+  },
+  wordmark: {
+    color        : '#FFFFFF',
+    fontSize     : 26,
+    fontWeight   : '900',
+    letterSpacing: 6,
+    textTransform: 'uppercase',
+    marginBottom : 6,
+  },
+  location: {
+    color        : '#FFFFFF',
+    fontSize     : 13,
+    fontWeight   : '500',
+    letterSpacing: 1.5,
+    marginBottom : 20,
+  },
+  separator: {
+    width          : 56,
+    height         : 2,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius   : 1,
+    marginBottom   : 16,
+    opacity        : 0.7,
+  },
+  choose: {
+    color        : '#FFFFFF',
+    fontSize     : 15,
+    fontWeight   : '600',
+    letterSpacing: 0.3,
+  },
+  cards: {
+    gap: 0,
+  },
+  hintRow: {
+    flexDirection : 'row',
+    alignItems    : 'center',
+    justifyContent: 'center',
+    gap           : 6,
+    marginTop     : 24,
+  },
+  hint: {
+    color        : 'rgba(255,255,255,0.35)',
+    fontSize     : 12,
+    fontWeight   : '500',
+    letterSpacing: 0.3,
+  },
 });
