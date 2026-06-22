@@ -1,20 +1,24 @@
 /**
  * app/(organizer)/event/[id].tsx — EVENTURE v3
  * Production-quality event detail page.
- * Design: #0F172A bg, #6366F1 indigo accent, Apple Liquid Glass cards.
+ * Design: #020818 bg, Apple Liquid Glass cards.
+ * Tabs: Détails / Équipe (invitations) / Missions (création + liste)
  */
 
 import React, {
   useCallback, useEffect, useRef, useState,
 } from 'react';
 import {
+  ActivityIndicator,
   Animated,
+  Linking,
   Platform,
   RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -31,13 +35,19 @@ const RNMaps       = Platform.OS !== 'web' ? require('react-native-maps') : null
 const MapView: any = RNMaps?.default ?? View;
 const Marker: any  = RNMaps?.Marker  ?? (() => null);
 
-/* ─── Design tokens — navy + white ONLY ─────────────────────────────────── */
+/* ─── Design tokens ──────────────────────────────────────────────────────── */
 const BG    = '#020818';
 const BLUE  = '#FFFFFF';
 const WHITE = '#FFFFFF';
 const MUTED = 'rgba(255,255,255,0.45)';
 const FAINT = 'rgba(255,255,255,0.06)';
+const GREEN = '#10B981';
+const RED   = '#EF4444';
 const EDGE  = 18;
+
+/* ─── Tab types ──────────────────────────────────────────────────────────── */
+const TABS = ['Détails', 'Équipe', 'Missions'] as const;
+type Tab = typeof TABS[number];
 
 /* ─── Status config ──────────────────────────────────────────────────────── */
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -330,18 +340,593 @@ function RoleRow({ role }: { role: EventRole }) {
   );
 }
 
+/* ─── Équipe Tab ─────────────────────────────────────────────────────────── */
+const STAFF_MEMBERS_LIST = [
+  { id: 'c49ef2fa-7041-4ef8-988a-a3059f762744', name: 'Oka',  role: 'Barman',  initials: 'O' },
+  { id: '6e3961b2-dcb8-4849-ab5f-613c20ab80b2', name: 'Redo', role: 'Serveur', initials: 'R' },
+] as const;
+
+type StaffEntry = typeof STAFF_MEMBERS_LIST[number];
+
+function EquipeTab({ eventId, eventTitle }: { eventId: string; eventTitle: string }) {
+  const [invitations, setInvitations] = useState<any[]>([]);
+  const [sending, setSending] = useState<string | null>(null);
+
+  const loadInvitations = useCallback(async () => {
+    const { data } = await supabase
+      .from('invitations')
+      .select('*')
+      .eq('event_id', eventId);
+    if (data) setInvitations(data);
+  }, [eventId]);
+
+  useEffect(() => {
+    loadInvitations();
+    const ch = supabase
+      .channel(`inv_${eventId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invitations', filter: `event_id=eq.${eventId}` }, loadInvitations)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [loadInvitations]);
+
+  const sendInvitation = async (staffMember: StaffEntry) => {
+    setSending(staffMember.id);
+
+    const existing = invitations.find((i) => i.staff_id === staffMember.id);
+    if (existing) {
+      await supabase
+        .from('invitations')
+        .update({ status: 'pending', sent_at: new Date().toISOString() })
+        .eq('id', existing.id);
+    } else {
+      const { data: inv } = await supabase
+        .from('invitations')
+        .insert({
+          event_id:     eventId,
+          staff_id:     staffMember.id,
+          organizer_id: '4c9525d8-04a6-41fb-beaa-9e9448134819',
+          status:       'pending',
+          message:      `Vous êtes invité(e) à l'événement "${eventTitle}". Merci de confirmer votre disponibilité.`,
+        })
+        .select()
+        .single();
+
+      if (inv) {
+        await supabase.from('in_app_notifications').insert({
+          staff_id:  staffMember.id,
+          event_id:  eventId,
+          type:      'invitation',
+          title:     `Invitation — ${eventTitle}`,
+          body:      `Arik vous invite à rejoindre l'événement "${eventTitle}". Confirmez votre présence.`,
+          data:      { event_id: eventId, invitation_id: inv.id },
+        });
+      }
+    }
+
+    await loadInvitations();
+    setSending(null);
+  };
+
+  const getInvStatus = (staffId: string) =>
+    invitations.find((i) => i.staff_id === staffId)?.status ?? null;
+
+  const statusConfig = {
+    pending:   { label: 'En attente', color: 'rgba(255,255,255,0.65)', bg: 'rgba(255,255,255,0.08)', border: 'rgba(255,255,255,0.20)' },
+    accepted:  { label: 'Acceptée',   color: GREEN,                    bg: 'rgba(16,185,129,0.12)',  border: 'rgba(16,185,129,0.30)' },
+    declined:  { label: 'Refusée',    color: RED,                      bg: 'rgba(239,68,68,0.10)',   border: 'rgba(239,68,68,0.25)' },
+    cancelled: { label: 'Annulée',    color: 'rgba(255,255,255,0.40)', bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.10)' },
+  };
+
+  return (
+    <View style={{ paddingHorizontal: 20 }}>
+      <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: '600', letterSpacing: 1, marginBottom: 16 }}>
+        INVITATIONS À L'ÉVÉNEMENT
+      </Text>
+
+      {STAFF_MEMBERS_LIST.map((s) => {
+        const invStatus = getInvStatus(s.id);
+        const cfg = invStatus ? statusConfig[invStatus as keyof typeof statusConfig] : null;
+        const isSending = sending === s.id;
+
+        return (
+          <BlurView key={s.id} intensity={18} tint="systemUltraThinMaterialDark" style={{ borderRadius: 20, overflow: 'hidden', marginBottom: 12 }}>
+            <View style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.14)', padding: 16 }}>
+              <LinearGradient
+                colors={['rgba(255,255,255,0.10)', 'transparent']}
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 40, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}
+              />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                {/* Avatar */}
+                <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' }}>
+                  <Text style={{ color: WHITE, fontSize: 18, fontWeight: '900' }}>{s.initials}</Text>
+                </View>
+                {/* Info */}
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: WHITE, fontSize: 16, fontWeight: '800' }}>{s.name}</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.50)', fontSize: 12 }}>{s.role}</Text>
+                </View>
+                {/* Status badge */}
+                {cfg && (
+                  <View style={{ backgroundColor: cfg.bg, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4, borderWidth: StyleSheet.hairlineWidth, borderColor: cfg.border }}>
+                    <Text style={{ color: cfg.color, fontSize: 11, fontWeight: '700' }}>{cfg.label}</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Action buttons */}
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
+                <TouchableOpacity
+                  onPress={() => sendInvitation(s)}
+                  disabled={isSending || invStatus === 'accepted'}
+                  style={{
+                    flex: 1, paddingVertical: 11, borderRadius: 13,
+                    backgroundColor: invStatus === 'accepted' ? 'rgba(16,185,129,0.15)' : WHITE,
+                    alignItems: 'center', opacity: (isSending || invStatus === 'accepted') ? 0.6 : 1,
+                  }}
+                >
+                  {isSending
+                    ? <ActivityIndicator size="small" color="#020818" />
+                    : (
+                      <Text style={{ color: invStatus === 'accepted' ? GREEN : '#020818', fontSize: 13, fontWeight: '800' }}>
+                        {invStatus === 'accepted' ? 'Acceptée' : invStatus === 'pending' ? 'Renvoyer' : 'Inviter'}
+                      </Text>
+                    )
+                  }
+                </TouchableOpacity>
+
+                {/* WhatsApp shortcut */}
+                <TouchableOpacity
+                  onPress={() => {
+                    const msg = encodeURIComponent(`Bonjour ${s.name} ! Arik vous invite à l'événement "${eventTitle}". Merci de confirmer.`);
+                    Linking.openURL(`whatsapp://send?phone=33666167788&text=${msg}`)
+                      .catch(() => Linking.openURL(`https://wa.me/33666167788?text=${msg}`));
+                  }}
+                  style={{ width: 44, height: 44, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Ionicons name="logo-whatsapp" size={20} color={WHITE} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </BlurView>
+        );
+      })}
+    </View>
+  );
+}
+
+/* ─── Missions Tab ───────────────────────────────────────────────────────── */
+const ROLES_LIST = ['Barman', 'Serveur', 'Bar Manager', 'DJ', 'Sécurité', 'Hôte/Hôtesse'] as const;
+
+function MissionsTab({ eventId, eventTitle }: { eventId: string; eventTitle: string; eventDate: string }) {
+  const [missions, setMissions] = useState<any[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({
+    staff_id:        '',
+    role:            '',
+    scheduled_start: '',
+    scheduled_end:   '',
+    hourly_rate:     '15',
+    notes:           '',
+  });
+  const [saving, setSaving] = useState(false);
+
+  const loadMissions = useCallback(async () => {
+    const { data } = await supabase
+      .from('missions')
+      .select('*, staff:staff_id(display_name)')
+      .eq('event_id', eventId)
+      .order('created_at', { ascending: false });
+    if (data) setMissions(data);
+  }, [eventId]);
+
+  useEffect(() => {
+    loadMissions();
+    const ch = supabase
+      .channel(`missions_${eventId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'missions', filter: `event_id=eq.${eventId}` }, loadMissions)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [loadMissions]);
+
+  const createMission = async () => {
+    if (!form.staff_id || !form.role) return;
+    setSaving(true);
+
+    const { data: mission } = await supabase
+      .from('missions')
+      .insert({
+        staff_id:        form.staff_id,
+        event_id:        eventId,
+        mission_status:  'assigned',
+        role:            form.role,
+        scheduled_start: form.scheduled_start || null,
+        scheduled_end:   form.scheduled_end   || null,
+        hourly_rate:     parseFloat(form.hourly_rate) || 15,
+        notes:           form.notes || null,
+      })
+      .select()
+      .single();
+
+    if (mission) {
+      await supabase.from('in_app_notifications').insert({
+        staff_id:   form.staff_id,
+        event_id:   eventId,
+        mission_id: mission.id,
+        type:       'mission_assigned',
+        title:      `Nouvelle mission — ${eventTitle}`,
+        body:       `Vous avez été assigné(e) au poste de ${form.role} pour cet événement.`,
+        data:       { mission_id: mission.id, event_id: eventId },
+      });
+    }
+
+    setForm({ staff_id: '', role: '', scheduled_start: '', scheduled_end: '', hourly_rate: '15', notes: '' });
+    setShowForm(false);
+    setSaving(false);
+    loadMissions();
+  };
+
+  const missionStatusConfig = {
+    assigned:    { label: 'Assignée',  color: 'rgba(255,255,255,0.65)', bg: 'rgba(255,255,255,0.08)' },
+    confirmed:   { label: 'Confirmée', color: GREEN,                    bg: 'rgba(16,185,129,0.12)' },
+    in_progress: { label: 'En cours',  color: WHITE,                    bg: 'rgba(255,255,255,0.12)' },
+    completed:   { label: 'Terminée',  color: GREEN,                    bg: 'rgba(16,185,129,0.10)' },
+    cancelled:   { label: 'Annulée',   color: RED,                      bg: 'rgba(239,68,68,0.10)' },
+  };
+
+  return (
+    <View style={{ paddingHorizontal: 20 }}>
+      {/* Header + Add button */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: '600', letterSpacing: 1 }}>
+          MISSIONS ({missions.length})
+        </Text>
+        <TouchableOpacity
+          onPress={() => setShowForm((f) => !f)}
+          style={{ backgroundColor: WHITE, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 8, flexDirection: 'row', gap: 6, alignItems: 'center' }}
+        >
+          <Ionicons name={showForm ? 'close' : 'add'} size={16} color="#020818" />
+          <Text style={{ color: '#020818', fontSize: 12, fontWeight: '800' }}>{showForm ? 'Annuler' : 'Créer'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Create mission form */}
+      {showForm && (
+        <BlurView intensity={18} tint="systemUltraThinMaterialDark" style={{ borderRadius: 20, overflow: 'hidden', marginBottom: 16 }}>
+          <View style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.14)', padding: 18 }}>
+            <LinearGradient
+              colors={['rgba(255,255,255,0.12)', 'transparent']}
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 48, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}
+            />
+
+            <Text style={{ color: WHITE, fontSize: 15, fontWeight: '800', marginBottom: 16 }}>Nouvelle Mission</Text>
+
+            {/* Staff selector */}
+            <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: '700', letterSpacing: 1, marginBottom: 8 }}>STAFF</Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+              {STAFF_MEMBERS_LIST.map((s) => (
+                <TouchableOpacity
+                  key={s.id}
+                  onPress={() => setForm((f) => ({ ...f, staff_id: s.id, role: f.role || s.role }))}
+                  style={{
+                    flex: 1, paddingVertical: 12, borderRadius: 14, alignItems: 'center',
+                    backgroundColor: form.staff_id === s.id ? WHITE : 'rgba(255,255,255,0.08)',
+                    borderWidth: 1,
+                    borderColor: form.staff_id === s.id ? WHITE : 'rgba(255,255,255,0.15)',
+                  }}
+                >
+                  <Text style={{ color: form.staff_id === s.id ? '#020818' : WHITE, fontSize: 14, fontWeight: '800' }}>{s.name}</Text>
+                  <Text style={{ color: form.staff_id === s.id ? '#020818' : 'rgba(255,255,255,0.50)', fontSize: 11, marginTop: 2 }}>{s.role}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Role selector */}
+            <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: '700', letterSpacing: 1, marginBottom: 8 }}>POSTE</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {ROLES_LIST.map((r) => (
+                  <TouchableOpacity
+                    key={r}
+                    onPress={() => setForm((f) => ({ ...f, role: r }))}
+                    style={{
+                      paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+                      backgroundColor: form.role === r ? WHITE : 'rgba(255,255,255,0.08)',
+                      borderWidth: 1, borderColor: form.role === r ? WHITE : 'rgba(255,255,255,0.15)',
+                    }}
+                  >
+                    <Text style={{ color: form.role === r ? '#020818' : WHITE, fontSize: 12, fontWeight: '700' }}>{r}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+
+            {/* Time inputs */}
+            <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: '700', letterSpacing: 1, marginBottom: 8 }}>HORAIRES</Text>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: 'rgba(255,255,255,0.40)', fontSize: 11, marginBottom: 4 }}>Début</Text>
+                <TextInput
+                  value={form.scheduled_start}
+                  onChangeText={(v) => setForm((f) => ({ ...f, scheduled_start: v }))}
+                  placeholder="16:00"
+                  placeholderTextColor="rgba(255,255,255,0.25)"
+                  style={{ backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: 12, color: WHITE, fontSize: 14, fontWeight: '600', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' }}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: 'rgba(255,255,255,0.40)', fontSize: 11, marginBottom: 4 }}>Fin</Text>
+                <TextInput
+                  value={form.scheduled_end}
+                  onChangeText={(v) => setForm((f) => ({ ...f, scheduled_end: v }))}
+                  placeholder="02:00"
+                  placeholderTextColor="rgba(255,255,255,0.25)"
+                  style={{ backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: 12, color: WHITE, fontSize: 14, fontWeight: '600', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' }}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: 'rgba(255,255,255,0.40)', fontSize: 11, marginBottom: 4 }}>Taux (€/h)</Text>
+                <TextInput
+                  value={form.hourly_rate}
+                  onChangeText={(v) => setForm((f) => ({ ...f, hourly_rate: v }))}
+                  keyboardType="decimal-pad"
+                  placeholder="15"
+                  placeholderTextColor="rgba(255,255,255,0.25)"
+                  style={{ backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: 12, color: WHITE, fontSize: 14, fontWeight: '600', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' }}
+                />
+              </View>
+            </View>
+
+            {/* Notes */}
+            <TextInput
+              value={form.notes}
+              onChangeText={(v) => setForm((f) => ({ ...f, notes: v }))}
+              placeholder="Notes optionnelles..."
+              placeholderTextColor="rgba(255,255,255,0.25)"
+              multiline
+              numberOfLines={2}
+              style={{ backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: 12, color: WHITE, fontSize: 13, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', marginBottom: 16, minHeight: 60, textAlignVertical: 'top' }}
+            />
+
+            {/* Submit */}
+            <TouchableOpacity
+              onPress={createMission}
+              disabled={!form.staff_id || !form.role || saving}
+              style={{ backgroundColor: WHITE, borderRadius: 14, padding: 15, alignItems: 'center', opacity: (!form.staff_id || !form.role || saving) ? 0.5 : 1 }}
+            >
+              {saving
+                ? <ActivityIndicator size="small" color="#020818" />
+                : <Text style={{ color: '#020818', fontSize: 15, fontWeight: '900' }}>Créer la Mission</Text>
+              }
+            </TouchableOpacity>
+          </View>
+        </BlurView>
+      )}
+
+      {/* Missions list */}
+      {missions.length === 0 ? (
+        <View style={{ alignItems: 'center', paddingVertical: 40, gap: 12 }}>
+          <Ionicons name="briefcase-outline" size={44} color="rgba(255,255,255,0.20)" />
+          <Text style={{ color: WHITE, fontSize: 15, fontWeight: '700' }}>Aucune mission</Text>
+          <Text style={{ color: 'rgba(255,255,255,0.40)', fontSize: 13, textAlign: 'center' }}>
+            Créez des missions pour assigner Oka et Redo à cet événement.
+          </Text>
+        </View>
+      ) : missions.map((m) => {
+        const cfg = missionStatusConfig[m.mission_status as keyof typeof missionStatusConfig] ?? missionStatusConfig.assigned;
+        const staffName: string = m.staff?.display_name ?? 'Staff';
+        return (
+          <BlurView key={m.id} intensity={14} tint="systemUltraThinMaterialDark" style={{ borderRadius: 18, overflow: 'hidden', marginBottom: 10 }}>
+            <View style={{ backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.12)', padding: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}>
+                  <Text style={{ color: WHITE, fontSize: 15, fontWeight: '900' }}>{staffName[0]}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: WHITE, fontSize: 15, fontWeight: '800' }}>{staffName}</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12 }}>{m.role} · {m.hourly_rate}€/h</Text>
+                </View>
+                <View style={{ backgroundColor: cfg.bg, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 }}>
+                  <Text style={{ color: cfg.color, fontSize: 11, fontWeight: '700' }}>{cfg.label}</Text>
+                </View>
+              </View>
+              {(m.scheduled_start || m.scheduled_end) && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 }}>
+                  <Ionicons name="time-outline" size={13} color="rgba(255,255,255,0.40)" />
+                  <Text style={{ color: 'rgba(255,255,255,0.60)', fontSize: 12 }}>
+                    {m.scheduled_start || '—'} → {m.scheduled_end || '—'}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </BlurView>
+        );
+      })}
+    </View>
+  );
+}
+
+/* ─── Détails Tab ────────────────────────────────────────────────────────── */
+function DetailsTab({
+  event,
+  missions,
+  roles,
+  router,
+}: {
+  event: EventRow;
+  missions: Mission[];
+  roles: EventRole[];
+  router: ReturnType<typeof useRouter>;
+}) {
+  const hasMap = !!(event.latitude && event.longitude && Platform.OS !== 'web');
+
+  return (
+    <>
+      {/* ──────────────────────── 3. INFO CARDS ──────────────────────────── */}
+      <View style={styles.section}>
+
+        {/* Row: Dates + Budget */}
+        <View style={styles.twoColRow}>
+
+          {/* Card: Dates */}
+          <GlassCard style={[styles.halfCard, { padding: 16 }]}>
+            <View style={styles.cardIconRow}>
+              <Ionicons name="calendar-outline" size={16} color={BLUE} />
+              <Text style={styles.cardLabel}>Dates</Text>
+            </View>
+            <Text style={styles.cardValueLg}>
+              {formatDate(event.date_start, false)}
+            </Text>
+            {event.date_end && (
+              <View style={styles.dateEndRow}>
+                <Ionicons name="arrow-forward-outline" size={12} color={MUTED} />
+                <Text style={styles.cardValueSm}>
+                  {formatDate(event.date_end, false)}
+                </Text>
+              </View>
+            )}
+            {event.date_start && (
+              <Text style={styles.cardTimeSm}>
+                {new Date(event.date_start).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+              </Text>
+            )}
+          </GlassCard>
+
+          {/* Card: Budget */}
+          <GlassCard style={[styles.halfCard, { padding: 16 }]}>
+            <View style={styles.cardIconRow}>
+              <Ionicons name="cash-outline" size={16} color={BLUE} />
+              <Text style={styles.cardLabel}>Budget</Text>
+            </View>
+            <Text style={styles.budgetValue}>{formatCurrency(event.budget)}</Text>
+            <Text style={styles.budgetSub}>budget total</Text>
+
+            {/* Quick mission payment summary */}
+            {missions.length > 0 && (() => {
+              const totalDue  = missions.reduce((a, m) => a + (m.amount_due  ?? 0), 0);
+              const totalPaid = missions.reduce((a, m) => a + (m.amount_paid ?? 0), 0);
+              return (
+                <View style={{ marginTop: 10, gap: 4 }}>
+                  <View style={styles.payRow}>
+                    <Text style={styles.payLabel}>Missions</Text>
+                    <Text style={styles.payValue}>{formatCurrency(totalDue)}</Text>
+                  </View>
+                  <View style={styles.payRow}>
+                    <Text style={styles.payLabel}>Payé</Text>
+                    <Text style={[styles.payValue, { color: BLUE }]}>{formatCurrency(totalPaid)}</Text>
+                  </View>
+                </View>
+              );
+            })()}
+          </GlassCard>
+        </View>
+
+        {/* Card: Localisation (full width) */}
+        <GlassCard style={{ padding: 16, marginTop: 14 }}>
+          <View style={styles.cardIconRow}>
+            <Ionicons name="location-outline" size={16} color={BLUE} />
+            <Text style={styles.cardLabel}>Localisation</Text>
+          </View>
+          <Text style={styles.locationText} numberOfLines={2}>
+            {event.location ?? 'Lieu non renseigné'}
+          </Text>
+
+          {/* Mini map */}
+          {hasMap && (
+            <MapView
+              style={styles.miniMap}
+              initialRegion={{
+                latitude: event.latitude!,
+                longitude: event.longitude!,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+              }}
+              customMapStyle={mapStyle}
+              scrollEnabled={false}
+              zoomEnabled={false}
+              rotateEnabled={false}
+              userInterfaceStyle="dark"
+            >
+              <Marker
+                coordinate={{ latitude: event.latitude!, longitude: event.longitude! }}
+                pinColor={BLUE}
+              />
+            </MapView>
+          )}
+        </GlassCard>
+
+        {/* Card: Description (if any) */}
+        {event.description ? (
+          <GlassCard style={{ padding: 16, marginTop: 14 }}>
+            <View style={styles.cardIconRow}>
+              <Ionicons name="document-text-outline" size={16} color={BLUE} />
+              <Text style={styles.cardLabel}>Description</Text>
+            </View>
+            <ExpandableText text={event.description} />
+          </GlassCard>
+        ) : null}
+      </View>
+
+      {/* ──────────────────────── 4. STAFF / MISSIONS ────────────────────── */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Ionicons name="people-outline" size={18} color={WHITE} style={{ marginRight: 8 }} />
+          <Text style={styles.sectionTitle}>Équipe</Text>
+          {missions.length > 0 && (
+            <View style={styles.countBadge}>
+              <Text style={styles.countBadgeText}>{missions.length}</Text>
+            </View>
+          )}
+        </View>
+
+        {missions.length === 0 ? (
+          <GlassCard style={{ padding: 24, alignItems: 'center', gap: 10 }}>
+            <Ionicons name="person-add-outline" size={32} color="rgba(255,255,255,0.20)" />
+            <Text style={styles.emptyText}>Aucun staff assigné</Text>
+          </GlassCard>
+        ) : (
+          missions.map((m) => (
+            <StaffCard
+              key={m.id}
+              mission={m}
+              onPress={() => router.push('/(organizer)/missions')}
+            />
+          ))
+        )}
+      </View>
+
+      {/* ──────────────────────── 5. ROLES SECTION ───────────────────────── */}
+      {roles.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="briefcase-outline" size={18} color={WHITE} style={{ marginRight: 8 }} />
+            <Text style={styles.sectionTitle}>Postes</Text>
+            <View style={styles.countBadge}>
+              <Text style={styles.countBadgeText}>{roles.length}</Text>
+            </View>
+          </View>
+
+          {roles.map((r) => (
+            <RoleRow key={r.id} role={r} />
+          ))}
+        </View>
+      )}
+    </>
+  );
+}
+
 /* ─── Main screen ─────────────────────────────────────────────────────────── */
 export default function EventDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id }  = useLocalSearchParams<{ id: string }>();
 
-  const [event,    setEvent]    = useState<EventRow | null>(null);
-  const [missions, setMissions] = useState<Mission[]>([]);
-  const [roles,    setRoles]    = useState<EventRole[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [error,    setError]    = useState<string | null>(null);
+  const [event,      setEvent]      = useState<EventRow | null>(null);
+  const [missions,   setMissions]   = useState<Mission[]>([]);
+  const [roles,      setRoles]      = useState<EventRole[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab,  setActiveTab]  = useState<Tab>('Détails');
 
   /* ─── Fetch ─────────────────────────────────────────────────────────────── */
   const fetchAll = useCallback(async () => {
@@ -395,7 +980,7 @@ export default function EventDetailScreen() {
         <StatusBar barStyle="light-content" />
         <Ionicons name="alert-circle-outline" size={48} color="rgba(255,255,255,0.3)" />
         <Text style={styles.errorTitle}>Événement introuvable</Text>
-        <Text style={styles.errorSub}>{error ?? 'Cet événement n\'existe pas.'}</Text>
+        <Text style={styles.errorSub}>{error ?? "Cet événement n'existe pas."}</Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.errorBtn}>
           <Text style={styles.errorBtnText}>Retour</Text>
         </TouchableOpacity>
@@ -408,7 +993,33 @@ export default function EventDetailScreen() {
   const typeIcon: React.ComponentProps<typeof Ionicons>['name'] =
     TYPE_ICONS[event.type ?? ''] ?? 'calendar-outline';
 
-  const hasMap  = !!(event.latitude && event.longitude && Platform.OS !== 'web');
+  /* ─── Tab pills ──────────────────────────────────────────────────────────── */
+  const tabPills = (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={{ paddingHorizontal: 20, marginBottom: 16 }}
+    >
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        {TABS.map((tab) => (
+          <TouchableOpacity
+            key={tab}
+            onPress={() => setActiveTab(tab)}
+            style={{
+              paddingHorizontal: 20, paddingVertical: 9, borderRadius: 22,
+              backgroundColor: activeTab === tab ? WHITE : 'rgba(255,255,255,0.08)',
+              borderWidth: StyleSheet.hairlineWidth,
+              borderColor: activeTab === tab ? WHITE : 'rgba(255,255,255,0.15)',
+            }}
+          >
+            <Text style={{ color: activeTab === tab ? '#020818' : WHITE, fontSize: 13, fontWeight: '700' }}>
+              {tab}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </ScrollView>
+  );
 
   /* ─── Render ──────────────────────────────────────────────────────────────── */
   return (
@@ -523,158 +1134,31 @@ export default function EventDetailScreen() {
           </View>
         </View>
 
-        {/* ──────────────────────── 3. INFO CARDS ──────────────────────────── */}
-        <View style={styles.section}>
+        {/* ──────────────────────── 3. TAB PILLS ───────────────────────────── */}
+        {tabPills}
 
-          {/* Row: Dates + Localisation */}
-          <View style={styles.twoColRow}>
-
-            {/* Card: Dates */}
-            <GlassCard style={[styles.halfCard, { padding: 16 }]}>
-              <View style={styles.cardIconRow}>
-                <Ionicons name="calendar-outline" size={16} color={BLUE} />
-                <Text style={styles.cardLabel}>Dates</Text>
-              </View>
-              <Text style={styles.cardValueLg}>
-                {formatDate(event.date_start, false)}
-              </Text>
-              {event.date_end && (
-                <View style={styles.dateEndRow}>
-                  <Ionicons name="arrow-forward-outline" size={12} color={MUTED} />
-                  <Text style={styles.cardValueSm}>
-                    {formatDate(event.date_end, false)}
-                  </Text>
-                </View>
-              )}
-              {event.date_start && (
-                <Text style={styles.cardTimeSm}>
-                  {new Date(event.date_start).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-              )}
-            </GlassCard>
-
-            {/* Card: Budget */}
-            <GlassCard style={[styles.halfCard, { padding: 16 }]}>
-              <View style={styles.cardIconRow}>
-                <Ionicons name="cash-outline" size={16} color={BLUE} />
-                <Text style={styles.cardLabel}>Budget</Text>
-              </View>
-              <Text style={styles.budgetValue}>{formatCurrency(event.budget)}</Text>
-              <Text style={styles.budgetSub}>budget total</Text>
-
-              {/* Quick mission payment summary */}
-              {missions.length > 0 && (() => {
-                const totalDue  = missions.reduce((a, m) => a + (m.amount_due  ?? 0), 0);
-                const totalPaid = missions.reduce((a, m) => a + (m.amount_paid ?? 0), 0);
-                return (
-                  <View style={{ marginTop: 10, gap: 4 }}>
-                    <View style={styles.payRow}>
-                      <Text style={styles.payLabel}>Missions</Text>
-                      <Text style={styles.payValue}>{formatCurrency(totalDue)}</Text>
-                    </View>
-                    <View style={styles.payRow}>
-                      <Text style={styles.payLabel}>Payé</Text>
-                      <Text style={[styles.payValue, { color: BLUE }]}>{formatCurrency(totalPaid)}</Text>
-                    </View>
-                  </View>
-                );
-              })()}
-            </GlassCard>
-          </View>
-
-          {/* Card: Localisation (full width) */}
-          <GlassCard style={{ padding: 16, marginTop: 14 }}>
-            <View style={styles.cardIconRow}>
-              <Ionicons name="location-outline" size={16} color={BLUE} />
-              <Text style={styles.cardLabel}>Localisation</Text>
-            </View>
-            <Text style={styles.locationText} numberOfLines={2}>
-              {event.location ?? 'Lieu non renseigné'}
-            </Text>
-
-            {/* Mini map */}
-            {hasMap && (
-              <MapView
-                style={styles.miniMap}
-                initialRegion={{
-                  latitude: event.latitude!,
-                  longitude: event.longitude!,
-                  latitudeDelta: 0.01,
-                  longitudeDelta: 0.01,
-                }}
-                customMapStyle={mapStyle}
-                scrollEnabled={false}
-                zoomEnabled={false}
-                rotateEnabled={false}
-                userInterfaceStyle="dark"
-              >
-                <Marker
-                  coordinate={{ latitude: event.latitude!, longitude: event.longitude! }}
-                  pinColor={BLUE}
-                />
-              </MapView>
-            )}
-          </GlassCard>
-
-          {/* Card: Description (if any) */}
-          {event.description ? (
-            <GlassCard style={{ padding: 16, marginTop: 14 }}>
-              <View style={styles.cardIconRow}>
-                <Ionicons name="document-text-outline" size={16} color={BLUE} />
-                <Text style={styles.cardLabel}>Description</Text>
-              </View>
-              <ExpandableText text={event.description} />
-            </GlassCard>
-          ) : null}
-        </View>
-
-        {/* ──────────────────────── 4. STAFF / MISSIONS ────────────────────── */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="people-outline" size={18} color={WHITE} style={{ marginRight: 8 }} />
-            <Text style={styles.sectionTitle}>Équipe</Text>
-            {missions.length > 0 && (
-              <View style={styles.countBadge}>
-                <Text style={styles.countBadgeText}>{missions.length}</Text>
-              </View>
-            )}
-          </View>
-
-          {missions.length === 0 ? (
-            <GlassCard style={{ padding: 24, alignItems: 'center', gap: 10 }}>
-              <Ionicons name="person-add-outline" size={32} color="rgba(255,255,255,0.20)" />
-              <Text style={styles.emptyText}>Aucun staff assigné</Text>
-            </GlassCard>
-          ) : (
-            missions.map((m) => (
-              <StaffCard
-                key={m.id}
-                mission={m}
-                onPress={() => router.push('/(organizer)/missions')}
-              />
-            ))
-          )}
-        </View>
-
-        {/* ──────────────────────── 5. ROLES SECTION ───────────────────────── */}
-        {roles.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="briefcase-outline" size={18} color={WHITE} style={{ marginRight: 8 }} />
-              <Text style={styles.sectionTitle}>Postes</Text>
-              <View style={styles.countBadge}>
-                <Text style={styles.countBadgeText}>{roles.length}</Text>
-              </View>
-            </View>
-
-            {roles.map((r) => (
-              <RoleRow key={r.id} role={r} />
-            ))}
-          </View>
+        {/* ──────────────────────── 4. TAB CONTENT ─────────────────────────── */}
+        {activeTab === 'Détails' && (
+          <DetailsTab
+            event={event}
+            missions={missions}
+            roles={roles}
+            router={router}
+          />
+        )}
+        {activeTab === 'Équipe' && (
+          <EquipeTab eventId={event.id} eventTitle={event.title} />
+        )}
+        {activeTab === 'Missions' && (
+          <MissionsTab
+            eventId={event.id}
+            eventTitle={event.title}
+            eventDate={event.date_start ?? ''}
+          />
         )}
       </Animated.ScrollView>
 
-      {/* ──────────────────────── 6. FIXED ACTION BUTTON ─────────────────── */}
+      {/* ──────────────────────── 5. FIXED ACTION BUTTON ─────────────────── */}
       <View style={[styles.actionBarWrap, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         <BlurView intensity={65} tint="dark" style={StyleSheet.absoluteFill} />
         <LinearGradient
@@ -772,7 +1256,7 @@ const styles = StyleSheet.create({
   titleSection: {
     paddingHorizontal: EDGE,
     paddingTop: 22,
-    paddingBottom: 6,
+    paddingBottom: 12,
     gap: 12,
   },
   eventTitle: {
@@ -796,7 +1280,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: `rgba(255,255,255,0.15)`,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   typeChipText: {
     color: WHITE,

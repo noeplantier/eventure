@@ -32,15 +32,15 @@ const FAINT = 'rgba(255,255,255,0.06)';
 const EDGE  = 18;
 
 /* ─── Map style ──────────────────────────────────────────────────────────── */
-const mapStyle = [
-  { elementType: 'geometry', stylers: [{ color: '#0A1628' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#8BAFC9' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#030B1E' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#0C2A4A' }] },
-  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#0A1628' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#030B1E' }] },
-  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+const DARK_MAP_STYLE = [
+  { elementType: 'geometry', stylers: [{ color: '#0a1628' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#8ec3b9' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#1a3646' }] },
+  { featureType: 'administrative.country', elementType: 'geometry.stroke', stylers: [{ color: '#4b6878' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#304a7d' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#2c6675' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e1626' }] },
+  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#647474' }] },
 ];
 
 /* ─── Event-type colours (gradient covers) — navy + white only ─────────── */
@@ -62,6 +62,18 @@ const TYPE_ICONS: Record<string, React.ComponentProps<typeof Ionicons>['name']> 
   'Festival':   'ribbon-outline',
   'Gala':       'sparkles-outline',
   'Conférence': 'mic-outline',
+};
+
+const getEventIcon = (type: string | null): React.ComponentProps<typeof Ionicons>['name'] => {
+  const map: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
+    'Bar Night' : 'wine-outline',
+    'Concert'   : 'musical-notes-outline',
+    'Brunch'    : 'cafe-outline',
+    'Festival'  : 'musical-note-outline',
+    'Soirée'    : 'moon-outline',
+    'Gala'      : 'star-outline',
+  };
+  return map[type ?? ''] ?? 'location-outline';
 };
 
 /* ─── Status badge config (blanc + bleu uniquement) ─────────────────────── */
@@ -93,6 +105,7 @@ interface Event {
   cover_url: string | null;
   latitude: number | null;
   longitude: number | null;
+  mission_count?: number;
 }
 
 /* ─── Region helper ──────────────────────────────────────────────────────── */
@@ -271,7 +284,21 @@ const EventCard = memo(function EventCard({ event, onEdit, onView }: EventCardPr
         </View>
 
         <View style={ec.footer}>
-          <Text style={ec.budget}>{formatBudget(event.budget ?? 0)}</Text>
+          <View style={{ gap: 4 }}>
+            <Text style={ec.budget}>{formatBudget(event.budget ?? 0)}</Text>
+            {(event.mission_count ?? 0) > 0 && (
+              <View style={{
+                backgroundColor: 'rgba(16,185,129,0.15)', borderRadius: 8,
+                paddingHorizontal: 8, paddingVertical: 3,
+                borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(16,185,129,0.35)',
+                alignSelf: 'flex-start',
+              }}>
+                <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '700' }}>
+                  {event.mission_count} mission{(event.mission_count ?? 0) > 1 ? 's' : ''}
+                </Text>
+              </View>
+            )}
+          </View>
           <View style={ec.actions}>
             <TouchableOpacity
               style={[ec.actionBtn, { borderColor: 'rgba(255,255,255,0.15)', backgroundColor: 'rgba(255,255,255,0.06)' }]}
@@ -404,7 +431,7 @@ export default function EventsScreen() {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const PUTINCOFFEE_REGION = {
     latitude: -8.71674, longitude: 115.26249,
-    latitudeDelta: 0.02, longitudeDelta: 0.02,
+    latitudeDelta: 0.025, longitudeDelta: 0.025,
   };
   const [userRegion,    setUserRegion]    = useState(PUTINCOFFEE_REGION);
 
@@ -444,24 +471,37 @@ export default function EventsScreen() {
 
       if (error) { console.error('[events] fetch', error); }
       else {
-        setEvents((data ?? []) as Event[]);
-        const region = computeRegionFromEvents((data ?? []) as Event[]);
+        let eventsWithMissions: Event[] = (data ?? []) as Event[];
+
+        /* Fetch roles for mission count per event */
+        if (data && data.length > 0) {
+          const evtIds = data.map((e: any) => e.id);
+          const { data: roles } = await supabase
+            .from('event_roles')
+            .select('event_id, slots_available')
+            .in('event_id', evtIds);
+
+          const slotsByEvent: Record<string, number> = {};
+          let totalSlotCount = 0;
+          (roles ?? []).forEach((r: any) => {
+            slotsByEvent[r.event_id] = (slotsByEvent[r.event_id] ?? 0) + (Number(r.slots_available) || 0);
+            totalSlotCount += (Number(r.slots_available) || 0);
+          });
+          setTotalSlots(totalSlotCount);
+
+          eventsWithMissions = eventsWithMissions.map(e => ({
+            ...e,
+            mission_count: slotsByEvent[e.id] ?? 0,
+          }));
+        }
+
+        setEvents(eventsWithMissions);
+        const region = computeRegionFromEvents(eventsWithMissions);
         // Fall back to Put.in Coffee Sanur when no events have coordinates
         setUserRegion(region ?? {
           latitude: -8.71674, longitude: 115.26249,
-          latitudeDelta: 0.02, longitudeDelta: 0.02,
+          latitudeDelta: 0.025, longitudeDelta: 0.025,
         });
-      }
-
-      /* Fetch total slots from event_roles */
-      if (data && data.length > 0) {
-        const evtIds = data.map((e: any) => e.id);
-        const { data: roles } = await supabase
-          .from('event_roles')
-          .select('slots_available')
-          .in('event_id', evtIds);
-        const slots = (roles ?? []).reduce((s: number, r: any) => s + (Number(r.slots_available) || 0), 0);
-        setTotalSlots(slots);
       }
     } catch (e) {
       console.error('[events]', e);
@@ -473,7 +513,7 @@ export default function EventsScreen() {
 
   useEffect(() => {
     load();
-    const ch = supabase.channel('events_realtime')
+    const ch = supabase.channel('events_map_rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'event_roles' }, () => load())
       .subscribe();
@@ -663,44 +703,40 @@ export default function EventsScreen() {
               initialRegion={userRegion}
               region={userRegion}
               userInterfaceStyle="dark"
-              customMapStyle={mapStyle}
+              customMapStyle={DARK_MAP_STYLE}
               showsUserLocation
               showsCompass={false}
               showsScale={false}
             >
-              {filtered.filter(e => e.latitude && e.longitude).map(event => {
-                const isBar    = event.type === 'Bar Night' || (event as any).venue_type === 'bar';
-                const markerIcon = isBar ? 'wine-outline' : event.type === 'Festival' ? 'ribbon-outline' : event.type === 'Gala' ? 'sparkles-outline' : 'musical-notes-outline';
-                return (
-                  <Marker
-                    key={event.id}
-                    coordinate={{ latitude: event.latitude!, longitude: event.longitude! }}
-                    onPress={() => setSelectedEvent(event)}
-                  >
-                    <View style={{ alignItems: 'center' }}>
-                      <View style={{
-                        width: 40, height: 40, borderRadius: 20,
-                        backgroundColor: '#FFFFFF',
-                        alignItems: 'center', justifyContent: 'center',
-                        borderWidth: 2, borderColor: 'rgba(2,8,24,0.85)',
-                        shadowColor: '#FFFFFF', shadowOpacity: 0.4, shadowRadius: 8,
-                        shadowOffset: { width: 0, height: 0 },
-                      }}>
-                        <Ionicons name={markerIcon as any} size={18} color="#020818"/>
-                      </View>
-                      <View style={{
-                        backgroundColor: 'rgba(2,8,24,0.85)', borderRadius: 6,
-                        paddingHorizontal: 6, paddingVertical: 2, marginTop: 3,
-                        borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
-                      }}>
-                        <Text style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '700' }} numberOfLines={1}>
-                          {event.title.length > 14 ? event.title.slice(0, 13) + '…' : event.title}
-                        </Text>
-                      </View>
+              {filtered.filter(e => e.latitude && e.longitude).map(event => (
+                <Marker
+                  key={event.id}
+                  coordinate={{ latitude: event.latitude!, longitude: event.longitude! }}
+                  onPress={() => setSelectedEvent(event)}
+                >
+                  <View style={{ alignItems: 'center' }}>
+                    <View style={{
+                      width: 50, height: 50, borderRadius: 25,
+                      backgroundColor: 'rgba(2,8,24,0.85)',
+                      borderWidth: 2, borderColor: '#FFFFFF',
+                      alignItems: 'center', justifyContent: 'center',
+                      shadowColor: '#FFFFFF', shadowOpacity: 0.3, shadowRadius: 8,
+                      shadowOffset: { width: 0, height: 0 },
+                    }}>
+                      <Ionicons name={getEventIcon(event.type)} size={22} color="#FFFFFF"/>
                     </View>
-                  </Marker>
-                );
-              })}
+                    <View style={{
+                      backgroundColor: 'rgba(2,8,24,0.92)', borderRadius: 8,
+                      paddingHorizontal: 8, paddingVertical: 3, marginTop: 4,
+                      borderWidth: 1, borderColor: 'rgba(255,255,255,0.20)',
+                    }}>
+                      <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800' }} numberOfLines={1}>
+                        {event.title}
+                      </Text>
+                    </View>
+                  </View>
+                </Marker>
+              ))}
             </MapView>
 
             {/* Selected event bottom sheet */}

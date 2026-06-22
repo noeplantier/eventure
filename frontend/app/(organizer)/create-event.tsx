@@ -20,6 +20,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+// react-native-maps is native-only — lazy require prevents web bundle crash
+const RNMaps = Platform.OS !== 'web' ? require('react-native-maps') : null;
+const MapView: any = RNMaps?.default ?? View;
+const Marker: any  = RNMaps?.Marker  ?? (() => null);
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -71,6 +75,18 @@ const CAL_THEME = {
   textDayHeaderFontWeight: '600' as const,
 };
 
+/* ─── Dark map style ─────────────────────────────────────────────────────── */
+const DARK_MAP_STYLE = [
+  { elementType: 'geometry', stylers: [{ color: '#0a1628' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#8ec3b9' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#1a3646' }] },
+  { featureType: 'administrative.country', elementType: 'geometry.stroke', stylers: [{ color: '#4b6878' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#304a7d' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#2c6675' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e1626' }] },
+  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#647474' }] },
+];
+
 /* ─── Event types ────────────────────────────────────────────────────────── */
 const EVENT_TYPES = [
   'Gala', 'Festival', 'Conférence', 'Mariage',
@@ -85,6 +101,9 @@ interface EventForm {
   date_start : string;
   date_end   : string;
   location   : string;
+  venue_name : string;
+  latitude   : number | null;
+  longitude  : number | null;
   budget     : string;
   description: string;
   cover_url  : string;
@@ -97,6 +116,9 @@ const EMPTY_FORM: EventForm = {
   date_start : '',
   date_end   : '',
   location   : '',
+  venue_name : '',
+  latitude   : null,
+  longitude  : null,
   budget     : '',
   description: '',
   cover_url  : '',
@@ -342,6 +364,14 @@ export default function CreateEventScreen() {
   const [showCalEnd,   setShowCalEnd]   = useState(false);
   const [geoLoading,   setGeoLoading]   = useState(false);
 
+  const [mapRegion,   setMapRegion]   = useState({
+    latitude     : -8.71674,
+    longitude    : 115.26249,
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
+  });
+  const [markerCoord, setMarkerCoord] = useState<{ latitude: number; longitude: number } | null>(null);
+
   /* helpers */
   const upd = useCallback(<K extends keyof EventForm>(key: K, val: EventForm[K]) => {
     setForm(f => ({ ...f, [key]: val }));
@@ -409,6 +439,9 @@ export default function CreateEventScreen() {
         date_start  : form.date_start.trim()  || null,
         date_end    : form.date_end.trim()     || null,
         location    : form.location.trim()     || null,
+        venue_name  : form.venue_name || 'Put.in Coffee',
+        latitude    : form.latitude   ?? null,
+        longitude   : form.longitude  ?? null,
         budget      : form.budget ? Number(form.budget) : null,
         description : form.description.trim()  || null,
         cover_url   : form.cover_url.trim()    || null,
@@ -508,11 +541,12 @@ export default function CreateEventScreen() {
           </View>
         </View>
 
+        {/* Part A — Nom du lieu */}
         <Field
-          label="LIEU *"
+          label="NOM DU LIEU *"
           value={form.location}
           onChangeText={v => upd('location', v)}
-          placeholder="Hotel Lutetia, Paris 6e"
+          placeholder="Put.in Coffee · Sanur, Bali"
           hasError={!!errors.location}
           errorMsg={errors.location}
           hint="Adresse complete ou nom de la salle"
@@ -521,7 +555,7 @@ export default function CreateEventScreen() {
           onPress={fillCurrentLocation}
           disabled={geoLoading}
           style={{
-            flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8,
+            flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4,
             alignSelf: 'flex-start',
             backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 20,
             paddingHorizontal: 14, paddingVertical: 7,
@@ -534,6 +568,145 @@ export default function CreateEventScreen() {
           }
           <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '600' }}>Ma position actuelle</Text>
         </TouchableOpacity>
+
+        {/* Part B — Carte interactive */}
+        <View style={{ marginTop: 16, marginBottom: 4 }}>
+          <Text style={{ color: '#FFFFFF', fontSize: 10.5, fontWeight: '700', letterSpacing: 1.2, marginBottom: 6 }}>
+            LOCALISATION SUR LA CARTE
+          </Text>
+          <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, marginBottom: 10 }}>
+            Appuyez sur la carte pour placer votre événement
+          </Text>
+
+          {/* Map container — Apple glass card */}
+          <BlurView intensity={18} tint="systemUltraThinMaterialDark" style={{ borderRadius: 20, overflow: 'hidden', height: 220 }}>
+            <View style={{ flex: 1, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.14)' }}>
+              {Platform.OS !== 'web' ? (
+                <MapView
+                  style={{ flex: 1 }}
+                  region={mapRegion}
+                  onRegionChangeComplete={setMapRegion}
+                  onPress={(e: any) => {
+                    const { latitude, longitude } = e.nativeEvent.coordinate;
+                    setMarkerCoord({ latitude, longitude });
+                    upd('latitude', latitude);
+                    upd('longitude', longitude);
+                  }}
+                  mapType="standard"
+                  showsUserLocation={false}
+                  customMapStyle={DARK_MAP_STYLE}
+                >
+                  {markerCoord && (
+                    <Marker
+                      coordinate={markerCoord}
+                      draggable
+                      onDragEnd={(e: any) => {
+                        const { latitude, longitude } = e.nativeEvent.coordinate;
+                        setMarkerCoord({ latitude, longitude });
+                        upd('latitude', latitude);
+                        upd('longitude', longitude);
+                      }}
+                    >
+                      <View style={{
+                        alignItems: 'center',
+                      }}>
+                        <View style={{
+                          width: 44, height: 44, borderRadius: 22,
+                          backgroundColor: '#FFFFFF',
+                          alignItems: 'center', justifyContent: 'center',
+                          borderWidth: 3, borderColor: 'rgba(2,8,24,0.90)',
+                          shadowColor: '#FFFFFF', shadowOpacity: 0.5, shadowRadius: 10,
+                          shadowOffset: { width: 0, height: 0 },
+                        }}>
+                          <Ionicons name="location-sharp" size={22} color="#020818"/>
+                        </View>
+                        <View style={{
+                          width: 0, height: 0,
+                          borderLeftWidth: 8, borderRightWidth: 8, borderTopWidth: 12,
+                          borderLeftColor: 'transparent', borderRightColor: 'transparent',
+                          borderTopColor: '#FFFFFF',
+                          alignSelf: 'center', marginTop: -2,
+                        }}/>
+                      </View>
+                    </Marker>
+                  )}
+                </MapView>
+              ) : (
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13 }}>
+                    Carte disponible sur iOS / Android
+                  </Text>
+                </View>
+              )}
+            </View>
+          </BlurView>
+
+          {/* Coordinates display */}
+          {markerCoord && (
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+              <View style={{
+                flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 10,
+                padding: 10, alignItems: 'center',
+                borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.10)',
+              }}>
+                <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: '600' }}>LAT</Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '700' }}>
+                  {markerCoord.latitude.toFixed(5)}
+                </Text>
+              </View>
+              <View style={{
+                flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 10,
+                padding: 10, alignItems: 'center',
+                borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.10)',
+              }}>
+                <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: '600' }}>LNG</Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '700' }}>
+                  {markerCoord.longitude.toFixed(5)}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  setMarkerCoord(null);
+                  upd('latitude', null);
+                  upd('longitude', null);
+                }}
+                style={{
+                  backgroundColor: 'rgba(239,68,68,0.15)', borderRadius: 10,
+                  padding: 10, alignItems: 'center', justifyContent: 'center',
+                  borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(239,68,68,0.30)',
+                  width: 44,
+                }}
+              >
+                <Ionicons name="trash-outline" size={18} color="#EF4444"/>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Quick-set button for Put.in Coffee */}
+          <TouchableOpacity
+            onPress={() => {
+              const coord = { latitude: -8.71674, longitude: 115.26249 };
+              setMarkerCoord(coord);
+              setMapRegion({ ...coord, latitudeDelta: 0.01, longitudeDelta: 0.01 });
+              upd('latitude', coord.latitude);
+              upd('longitude', coord.longitude);
+              upd('location', 'Put.in Coffee · Sanur, Bali');
+              upd('venue_name', 'Put.in Coffee');
+            }}
+            style={{
+              flexDirection: 'row', gap: 8,
+              backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12,
+              padding: 12, alignItems: 'center',
+              borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.12)',
+              marginTop: 10,
+            }}
+          >
+            <Ionicons name="cafe-outline" size={16} color="#FFFFFF"/>
+            <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '600' }}>
+              Placer sur Put.in Coffee · Sanur
+            </Text>
+          </TouchableOpacity>
+        </View>
       </GlassCard>
     </View>
   );
