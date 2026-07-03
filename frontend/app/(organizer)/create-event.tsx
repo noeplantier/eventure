@@ -32,6 +32,7 @@ import { Ionicons }       from '@expo/vector-icons';
 import { SafeAreaView }   from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker   from 'expo-image-picker';
+import DateTimePicker     from '@react-native-community/datetimepicker';
 import { supabase }       from '@/lib/supabase';
 import { getCurrentOrganizerId } from '@/services/api';
 
@@ -135,6 +136,70 @@ const Input = memo(({ value, onChangeText, placeholder, keyboardType, multiline,
 const inp = StyleSheet.create({
   wrap : { backgroundColor: C.surfaceAlt, borderRadius: 14, paddingHorizontal: 14, borderWidth: 1, borderColor: C.border },
   input: { color: C.text, fontSize: 14, paddingVertical: 14, lineHeight: 20 },
+});
+
+const fmtDateTime = (iso: string) => iso
+  ? new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  : '';
+
+/**
+ * Date + heure — évite un champ texte libre (source du bug "invalid input
+ * syntax for type timestamp" quand l'utilisateur tape un format inattendu).
+ * Web : <input type="datetime-local"> natif. Natif : @react-native-community/datetimepicker.
+ * `value`/`onChange` manipulent toujours une string ISO 8601 (ou '').
+ */
+const DateTimeField = memo(({ value, onChange, placeholder }: { value: string; onChange: (iso: string) => void; placeholder: string }) => {
+  const [showPicker, setShowPicker] = useState(false);
+
+  if (Platform.OS === 'web') {
+    const toLocalInputValue = (iso: string) => {
+      if (!iso) return '';
+      const d = new Date(iso);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+    return (
+      <View style={inp.wrap}>
+        {React.createElement('input', {
+          type: 'datetime-local',
+          value: toLocalInputValue(value),
+          onChange: (e: any) => {
+            const v = e.target.value as string;
+            onChange(v ? new Date(v).toISOString() : '');
+          },
+          style: {
+            border: 'none', outline: 'none', background: 'transparent',
+            color: C.text, fontSize: 14, paddingTop: 14, paddingBottom: 14,
+            width: '100%', fontFamily: 'inherit',
+          },
+        })}
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      <TouchableOpacity
+        style={[inp.wrap, { paddingVertical: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+        onPress={() => setShowPicker(true)} activeOpacity={0.78}>
+        <Text style={{ color: value ? C.text : C.textMuted, fontSize: 14 }}>
+          {value ? fmtDateTime(value) : placeholder}
+        </Text>
+        <Ionicons name="calendar-outline" size={16} color={C.textSub}/>
+      </TouchableOpacity>
+      {showPicker && (
+        <DateTimePicker
+          value={value ? new Date(value) : new Date()}
+          mode="datetime"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={(event, selectedDate) => {
+            setShowPicker(false);
+            if (event.type !== 'dismissed' && selectedDate) onChange(selectedDate.toISOString());
+          }}
+        />
+      )}
+    </View>
+  );
 });
 
 /* ─── Step indicator ───────────────────────────────────────────────────── */
@@ -407,14 +472,14 @@ export default function CreateEventScreen() {
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <View style={{ flex: 1 }}>
                 <Field label="Début *" error={errors.date_start}>
-                  <Input value={form.date_start} onChangeText={(v: string) => upd('date_start', v)}
-                    placeholder="YYYY-MM-DD HH:MM" maxLength={16}/>
+                  <DateTimeField value={form.date_start} onChange={(v: string) => upd('date_start', v)}
+                    placeholder="Sélectionner…"/>
                 </Field>
               </View>
               <View style={{ flex: 1 }}>
                 <Field label="Fin *" error={errors.date_end}>
-                  <Input value={form.date_end} onChangeText={(v: string) => upd('date_end', v)}
-                    placeholder="YYYY-MM-DD HH:MM" maxLength={16}/>
+                  <DateTimeField value={form.date_end} onChange={(v: string) => upd('date_end', v)}
+                    placeholder="Sélectionner…"/>
                 </Field>
               </View>
             </View>
@@ -607,7 +672,7 @@ export default function CreateEventScreen() {
             <View style={{ gap: 8 }}>
               {[
                 { icon: 'location-outline' as const, l: form.location || '—' },
-                { icon: 'calendar-outline' as const, l: form.date_start ? `${form.date_start} → ${form.date_end}` : '—' },
+                { icon: 'calendar-outline' as const, l: form.date_start ? `${fmtDateTime(form.date_start)} → ${fmtDateTime(form.date_end)}` : '—' },
                 { icon: 'cash-outline' as const, l: form.budget ? `${Number(form.budget).toLocaleString('fr-FR')}€ budget` : 'Pas de budget' },
                 { icon: 'people-outline' as const, l: form.guests_count ? `${form.guests_count} invités` : '—' },
               ].map(({ icon, l }) => (
