@@ -11,6 +11,7 @@ import {
 import { BlurView }  from 'expo-blur';
 import { Ionicons }  from '@expo/vector-icons';
 import { supabase }  from '@/lib/supabase';
+import { getCurrentOrganizerId } from '@/services/api';
 
 let _useRouter: (() => { push: (p: any) => void }) | null = null;
 let _usePathname: (() => string) | null = null;
@@ -149,16 +150,12 @@ function CustomNavBarInner() {
 
   useEffect(() => {
     let alive = true;
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!alive) return;
-      const userId = session?.user?.id;
-      if (userId) { setUid(userId); loadPending(userId); }
+    getCurrentOrganizerId().then(organizerId => {
+      if (!alive || !organizerId) return;
+      setUid(organizerId);
+      loadPending(organizerId);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => {
-      const userId = s?.user?.id;
-      if (userId) { setUid(userId); loadPending(userId); }
-    });
-    return () => { alive = false; subscription.unsubscribe(); };
+    return () => { alive = false; };
   }, [loadPending]);
 
   // Realtime: new applications

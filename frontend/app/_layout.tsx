@@ -29,7 +29,9 @@ import { Ionicons }          from '@expo/vector-icons';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient }    from 'expo-linear-gradient';
 import { supabase }          from '@/lib/supabase';
+import { AuthProvider }      from '@/contexts/AuthContext';
 import CustomNavBar          from '../components/CustomNavBar';
+import StaffNavBar           from '../components/StaffNavBar';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -253,23 +255,33 @@ function useAntiScreenshot() {
 // ─────────────────────────────────────────────────────────────────────────────
 function NavBarWrapper() {
   const pathname = usePathname();
+  const segments = useSegments();
+  const group = segments[0] as string | undefined;
 
-  // Afficher UNIQUEMENT sur les 5 pages principales (tabs) de l'organisateur
-  const tabRoutes = [
-    '/dashboard', '/events', '/staff', '/missions', '/calendar',
-  ];
-  const isOnTab = tabRoutes.some(r => pathname.endsWith(r));
+  // Groupe (organizer) vs (staff) déterminé via les segments de route (pas de
+  // collision possible, contrairement à un simple pathname.endsWith — les deux
+  // groupes ont chacun un écran "dashboard").
+  if (group === '(organizer)') {
+    const tabRoutes = ['/dashboard', '/events', '/staff', '/missions', '/calendar'];
+    if (!tabRoutes.some(r => pathname.endsWith(r))) return null;
+    return (
+      <View style={lay.nav}>
+        <CustomNavBar/>
+      </View>
+    );
+  }
 
-  // Masquer sur les pages auth et toutes les sous-pages (push)
-  const hidden = pathname.includes('/(auth)') || !isOnTab;
+  if (group === '(staff)') {
+    const tabRoutes = ['/dashboard', '/planning', '/profile'];
+    if (!tabRoutes.some(r => pathname.endsWith(r))) return null;
+    return (
+      <View style={lay.nav}>
+        <StaffNavBar/>
+      </View>
+    );
+  }
 
-  if (hidden) return null;
-
-  return (
-    <View style={lay.nav}>
-      <CustomNavBar/>
-    </View>
-  );
+  return null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -292,6 +304,7 @@ export default function RootLayout() {
   if (!ready) return null;
 
   return (
+    <AuthProvider>
     <SafeAreaProvider>
       <StatusBar style="dark"/>
 
@@ -332,6 +345,10 @@ export default function RootLayout() {
           options={{ animation: 'slide_from_bottom', gestureDirection: 'vertical', contentStyle: { backgroundColor: '#020A06' } }}/>
 
         {/* ── Staff ── */}
+        <Stack.Screen name="(staff)/dashboard"
+          options={{ animation: 'none' }}/>
+        <Stack.Screen name="(staff)/planning"
+          options={{ animation: 'none' }}/>
         <Stack.Screen name="(staff)/feed"
           options={{ animation: 'none' }}/>
         <Stack.Screen name="(staff)/mission/[id]"
@@ -357,6 +374,7 @@ export default function RootLayout() {
       <ScreenshotOverlay visible={screenshotVisible}/>
 
     </SafeAreaProvider>
+    </AuthProvider>
   );
 }
 
