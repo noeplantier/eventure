@@ -33,6 +33,7 @@ import React, {
   import { useRouter }        from 'expo-router';
   import * as ImagePicker     from 'expo-image-picker';
   import { supabase }         from '@/lib/supabase';
+  import { getCurrentOrganizerId } from '@/services/api';
   
   /* ─── Palette & Layout (identique dashboard + profile) ────────────────── */
   const { width: SW } = Dimensions.get('window');
@@ -425,17 +426,15 @@ import React, {
     useEffect(() => {
       (async () => {
         try{
-          const { data:{ session } } = await supabase.auth.getSession();
-          if(!session) return;
-          const uid = session.user.id;
-  
-          // Try organizers first (même que profile.tsx)
+          const uid = await getCurrentOrganizerId();
+          if(!uid) return;
+
           const { data: org } = await supabase
             .from('organizers')
             .select('contact_name,company_name,bio,avatar_url,location,website,phone,is_pro,verified,specialties,event_types,instagram,linkedin')
             .eq('id', uid)
             .single();
-  
+
           if(org) {
             setForm({
               display_name : (org as any).contact_name ?? '',
@@ -450,28 +449,6 @@ import React, {
               specialties  : (org as any).specialties ?? [],
               event_types  : (org as any).event_types ?? [],
             });
-          } else {
-            // Fallback profiles (même que profile.tsx)
-            const { data: fp } = await supabase
-              .from('profiles')
-              .select('display_name,company_name,bio,avatar_url,location,website,phone,specialties,event_types,instagram,linkedin')
-              .eq('id', uid)
-              .single();
-            if(fp) {
-              setForm({
-                display_name : (fp as any).display_name ?? '',
-                company_name : (fp as any).company_name ?? '',
-                bio          : (fp as any).bio ?? '',
-                location     : (fp as any).location ?? '',
-                website      : (fp as any).website ?? '',
-                phone        : (fp as any).phone ?? '',
-                instagram    : (fp as any).instagram ?? '',
-                linkedin     : (fp as any).linkedin ?? '',
-                avatar_url   : (fp as any).avatar_url ?? '',
-                specialties  : (fp as any).specialties ?? [],
-                event_types  : (fp as any).event_types ?? [],
-              });
-            }
           }
         } catch(e) {
           console.error('[edit-profile load]', e);
@@ -497,10 +474,10 @@ import React, {
         const asset = res.assets[0];
         setUploading(true);
         try{
-          const { data:{ session } } = await supabase.auth.getSession();
-          if(!session) throw new Error('Non authentifié');
+          const uid = await getCurrentOrganizerId();
+          if(!uid) throw new Error('Aucun profil organisateur lié à cet appareil');
           const ext    = asset.uri.split('.').pop() ?? 'jpg';
-          const path   = `organizers/${session.user.id}/avatar.${ext}`;
+          const path   = `organizers/${uid}/avatar.${ext}`;
           const blob   = await (await fetch(asset.uri)).blob();
           const { error: upErr } = await supabase.storage
             .from('avatars')
@@ -553,9 +530,8 @@ import React, {
       }
       setSaving(true);
       try{
-        const { data:{ session } } = await supabase.auth.getSession();
-        if(!session) throw new Error('Non authentifié');
-        const uid = session.user.id;
+        const uid = await getCurrentOrganizerId();
+        if(!uid) throw new Error('Aucun profil organisateur lié à cet appareil');
   
         const payload = {
           contact_name : form.display_name.trim(),
@@ -572,34 +548,11 @@ import React, {
           updated_at   : new Date().toISOString(),
         };
   
-        // Try organizers table first
         const { error: orgErr } = await supabase
           .from('organizers')
           .update(payload)
           .eq('id', uid);
-  
-        if(orgErr) {
-          // Fallback: upsert in profiles
-          const fallbackPayload = {
-            id           : uid,
-            display_name : form.display_name.trim(),
-            company_name : form.company_name.trim(),
-            bio          : form.bio.trim() || null,
-            location     : form.location.trim() || null,
-            website      : form.website.trim() || null,
-            phone        : form.phone.trim() || null,
-            instagram    : form.instagram.trim() || null,
-            linkedin     : form.linkedin.trim() || null,
-            avatar_url   : form.avatar_url || null,
-            specialties  : form.specialties,
-            event_types  : form.event_types,
-            updated_at   : new Date().toISOString(),
-          };
-          const { error: pfErr } = await supabase
-            .from('profiles')
-            .upsert(fallbackPayload, { onConflict:'id' });
-          if(pfErr) throw pfErr;
-        }
+        if(orgErr) throw orgErr;
   
         showToast(true, 'Profil mis à jour avec succès');
         // Laisse le toast apparaître puis retourne

@@ -6,7 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { COLORS } from '@/constants/theme';
-import { getEvents, getCurrentUser } from '@/lib/api';
+import { getEvents } from '@/lib/api';
+import { authAPI } from '@/services/api';
 
 const T = COLORS;
 
@@ -23,7 +24,7 @@ export default function StaffFeed() {
   const [filter, setFilter]   = useState('all');
 
   const load = async () => {
-    const [u, evts] = await Promise.all([getCurrentUser(), getEvents()]);
+    const [u, evts] = await Promise.all([authAPI.me(), getEvents()]);
     setUser(u); setEvents(evts as any[]); setLoading(false); setRefresh(false);
   };
 

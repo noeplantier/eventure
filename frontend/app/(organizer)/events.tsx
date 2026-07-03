@@ -12,6 +12,7 @@ import { Ionicons }       from '@expo/vector-icons';
 import { SafeAreaView }   from 'react-native-safe-area-context';
 import { useRouter }      from 'expo-router';
 import { supabase }       from '@/lib/supabase';
+import { getCurrentOrganizerId } from '@/services/api';
 
 /* ─── Design tokens ─────────────────────────────────────────────────────── */
 const { width: SW } = Dimensions.get('window');
@@ -227,9 +228,8 @@ export default function EventsScreen() {
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const uid = session.user.id;
+      const uid = await getCurrentOrganizerId();
+      if (!uid) return;
       const { data } = await supabase
         .from('events')
         .select('id,title,date_start,date_end,location,status,type,budget')

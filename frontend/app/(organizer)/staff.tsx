@@ -11,6 +11,7 @@ import { Ionicons }       from '@expo/vector-icons';
 import { SafeAreaView }   from 'react-native-safe-area-context';
 import { useRouter }      from 'expo-router';
 import { supabase }       from '@/lib/supabase';
+import { getCurrentOrganizerId } from '@/services/api';
 
 /* ─── Design tokens ─────────────────────────────────────────────────────── */
 const BG      = '#F8FAFC';
@@ -257,17 +258,17 @@ export default function StaffScreen() {
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const uid = session.user.id;
+      const uid = await getCurrentOrganizerId();
 
-      // Get all staff (available pool)
+      // Get all staff (available pool) — not organizer-scoped, loads regardless
       const { data: staffData } = await supabase
         .from('staff')
         .select('id,display_name,avatar_url,role,rating,missions_count,experience_years,bio')
         .order('rating', { ascending: false })
         .limit(50);
       setAvailableStaff((staffData ?? []) as StaffRow[]);
+
+      if (!uid) { setEngagedStaff([]); return; }
 
       // Get engaged staff (accepted applications for my events)
       const { data: evts } = await supabase

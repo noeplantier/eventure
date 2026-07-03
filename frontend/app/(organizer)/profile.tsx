@@ -15,6 +15,7 @@ import { Ionicons }       from '@expo/vector-icons';
 import { SafeAreaView }   from 'react-native-safe-area-context';
 import { useRouter }      from 'expo-router';
 import { supabase }       from '@/lib/supabase';
+import { getCurrentOrganizerId } from '@/services/api';
 
 const { width: SW } = Dimensions.get('window');
 const BG='#020A06';const GREEN='#00D97E';const GOLD='#F5C842';
@@ -186,48 +187,35 @@ export default function OrganizerProfileScreen() {
 
   const load=useCallback(async()=>{
     try{
-      const {data:{session}}=await supabase.auth.getSession();
-      const uid=session?.user?.id;
+      const uid=await getCurrentOrganizerId();
       if(!uid){setLoading(false);return;}
 
       // Parallel fetch
-      const [profRes,statsRes,eventsRes,missionsRes,reviewsRes]=await Promise.all([
+      const [profRes,statsRes,eventsRes,reviewsRes]=await Promise.all([
         supabase.from('organizers').select('*').eq('id',uid).single(),
         supabase.from('v_organizer_stats').select('*').eq('organizer_id',uid).single(),
         supabase.from('v_event_with_budget').select('id,title,location,date_start,date_end,type,status,budget_total,total_slots,filled_slots').eq('organizer_id',uid).order('date_start',{ascending:false}).limit(20),
-        supabase.from('missions').select('staff:staff_id(id,display_name,avatar_url,role,rating,hourly_rate,missions_count)').eq('event_id', uid).limit(10),
         supabase.from('reviews').select('id,rating,comment,created_at,reviewer_id').eq('reviewee_id',uid).order('created_at',{ascending:false}).limit(10),
       ]);
 
       if(profRes.data){
         const p=profRes.data as any;
-        setProfile({id:uid,display_name:p.contact_name??'',company_name:p.company_name??'',username:'',bio:p.bio??'',avatar_url:p.avatar_url??'',location:p.location??'',website:p.website??'',phone:p.phone??'',email:session?.user?.email??'',is_pro:p.is_pro??false,verified:p.verified??false,rating:p.rating??0});
-      }else{
-        // Fallback profiles table
-        const {data:fp}=await supabase.from('profiles').select('*').eq('id',uid).single();
-        if(fp) setProfile({id:uid,display_name:(fp as any).display_name??'',company_name:(fp as any).company_name??(fp as any).display_name??'',username:(fp as any).username??'',bio:(fp as any).bio??'',avatar_url:(fp as any).avatar_url??'',location:(fp as any).location??'',website:(fp as any).website??'',phone:(fp as any).phone??'',email:session?.user?.email??'',is_pro:(fp as any).is_pro??false,verified:(fp as any).verified??false,rating:(fp as any).rating??0});
+        setProfile({id:uid,display_name:p.contact_name??'',company_name:p.company_name??'',username:'',bio:p.bio??'',avatar_url:p.avatar_url??'',location:p.location??'',website:p.website??'',phone:p.phone??'',email:'',is_pro:p.is_pro??false,verified:p.verified??false,rating:p.rating??0});
       }
 
       if(statsRes.data) setStats(statsRes.data as any);
       if(eventsRes.data) setEvents(eventsRes.data as EventRow[]);
       if(reviewsRes.data) setReviews(reviewsRes.data as ReviewRow[]);
 
-      // Staff from missions
-      if(missionsRes.data){
-        const uniqueStaff=new Map();
-        (missionsRes.data as any[]).forEach(m=>{if(m.staff) uniqueStaff.set(m.staff.id,m.staff);});
-        setStaff([...uniqueStaff.values()] as StaffRow[]);
-      }else{
-        // Fallback: staff ayant des candidatures acceptées pour mes events
-        const evtIds=eventsRes.data?.map((e:any)=>e.id)??[];
-        if(evtIds.length>0){
-          const {data:roles}=await supabase.from('event_roles').select('id').in('event_id',evtIds);
-          if(roles?.length){
-            const {data:apps}=await supabase.from('applications').select('staff:staff_id(id,display_name,avatar_url,role,rating,hourly_rate,missions_count)').in('event_role_id',roles.map((r:any)=>r.id)).eq('status','accepted').limit(10);
-            const uniqueStaff=new Map();
-            (apps??[]).forEach((a:any)=>{if(a.staff)uniqueStaff.set(a.staff.id,a.staff);});
-            setStaff([...uniqueStaff.values()] as StaffRow[]);
-          }
+      // Staff ayant des candidatures acceptées pour mes events
+      const evtIds=eventsRes.data?.map((e:any)=>e.id)??[];
+      if(evtIds.length>0){
+        const {data:roles}=await supabase.from('event_roles').select('id').in('event_id',evtIds);
+        if(roles?.length){
+          const {data:apps}=await supabase.from('applications').select('staff:staff_id(id,display_name,avatar_url,role,rating,hourly_rate,missions_count)').in('event_role_id',roles.map((r:any)=>r.id)).eq('status','accepted').limit(10);
+          const uniqueStaff=new Map();
+          (apps??[]).forEach((a:any)=>{if(a.staff)uniqueStaff.set(a.staff.id,a.staff);});
+          setStaff([...uniqueStaff.values()] as StaffRow[]);
         }
       }
 
@@ -240,11 +228,11 @@ export default function OrganizerProfileScreen() {
   // Realtime
   useEffect(()=>{
     let ch:ReturnType<typeof supabase.channel>|null=null;let mounted=true;
-    supabase.auth.getSession().then(({data:{session}})=>{
-      if(!session||!mounted)return;
+    getCurrentOrganizerId().then((organizerId)=>{
+      if(!organizerId||!mounted)return;
       ch=supabase.channel('profile_rt')
-        .on('postgres_changes',{event:'*',schema:'public',table:'organizers',filter:`id=eq.${session.user.id}`},()=>{if(mounted)load();})
-        .on('postgres_changes',{event:'*',schema:'public',table:'events',filter:`organizer_id=eq.${session.user.id}`},()=>{if(mounted)load();})
+        .on('postgres_changes',{event:'*',schema:'public',table:'organizers',filter:`id=eq.${organizerId}`},()=>{if(mounted)load();})
+        .on('postgres_changes',{event:'*',schema:'public',table:'events',filter:`organizer_id=eq.${organizerId}`},()=>{if(mounted)load();})
         .subscribe();
     });
     return()=>{mounted=false;if(ch)supabase.removeChannel(ch);};

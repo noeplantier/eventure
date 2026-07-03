@@ -28,6 +28,7 @@ import React, {
   import { SafeAreaView }   from 'react-native-safe-area-context';
   import { useRouter }      from 'expo-router';
   import { supabase }       from '@/lib/supabase';
+  import { getCurrentOrganizerId } from '@/services/api';
   
   /* ─── Palette ADN dashboard ────────────────────────────────────────────── */
   const { width: SW } = Dimensions.get('window');
@@ -482,15 +483,14 @@ import React, {
     const load = useCallback(async(silent=false)=>{
       if(!silent) setLoading(true);
       try{
-        const{data:{session}}=await supabase.auth.getSession();
-        if(!session){setNotifs([]);return;}
-        const uid=session.user.id;
-  
+        const uid=await getCurrentOrganizerId();
+        if(!uid){setNotifs([]);return;}
+
         // Try dedicated notifications table first
         const{data:rows,error}=await supabase
           .from('notifications')
           .select('*')
-          .eq('organizer_id',uid)
+          .eq('user_id',uid)
           .order('created_at',{ascending:false})
           .limit(50);
   
@@ -532,9 +532,9 @@ import React, {
     /* ── Mark all read ── */
     const markAllRead = useCallback(async()=>{
       setNotifs(prev=>prev.map(n=>({...n,read:true})));
-      const{data:{session}}=await supabase.auth.getSession();
-      if(session)
-        await supabase.from('notifications').update({read:true}).eq('organizer_id',session.user.id);
+      const uid=await getCurrentOrganizerId();
+      if(uid)
+        await supabase.from('notifications').update({read:true}).eq('user_id',uid);
     },[]);
   
     /* ── Delete ── */

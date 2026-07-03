@@ -14,6 +14,7 @@ import { Ionicons }       from '@expo/vector-icons';
 import { SafeAreaView }   from 'react-native-safe-area-context';
 import { useRouter }      from 'expo-router';
 import { supabase }       from '@/lib/supabase';
+import { getCurrentOrganizerId } from '@/services/api';
 
 /* ─── Design tokens ─────────────────────────────────────────────────────── */
 const { width: SW } = Dimensions.get('window');
@@ -348,9 +349,8 @@ export default function Dashboard() {
 
   const fetch = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const uid = session.user.id;
+      const uid = await getCurrentOrganizerId();
+      if (!uid) return;
 
       const [orgRes, eventsRes] = await Promise.all([
         supabase.from('organizers').select('display_name,company_name,avatar_url').eq('id', uid).maybeSingle(),

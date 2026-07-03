@@ -33,6 +33,7 @@ import React, {
   import { SafeAreaView }   from 'react-native-safe-area-context';
   import { useRouter }      from 'expo-router';
   import { supabase }       from '@/lib/supabase';
+  import { getCurrentOrganizerId } from '@/services/api';
   
   /* ─── Palette ADN dashboard ────────────────────────────────────────────── */
   const { width: SW } = Dimensions.get('window');
@@ -257,12 +258,11 @@ import React, {
     useEffect(()=>{
       (async()=>{
         try{
-          const{data:{session}}=await supabase.auth.getSession();
-          if(!session)return;
-          setEmail(session.user.email??'');
+          const organizerId=await getCurrentOrganizerId();
+          if(!organizerId)return;
           const{data:org}=await supabase.from('organizers')
             .select('contact_name,company_name,is_pro,verified,notification_preferences,app_settings')
-            .eq('id',session.user.id).single();
+            .eq('id',organizerId).single();
           if(org){
             const o=org as any;
             setDisplayName(o.company_name||o.contact_name||'');
@@ -270,10 +270,6 @@ import React, {
             setVerified(o.verified??false);
             if(o.notification_preferences) setNotifPrefs({...DEFAULT_NOTIF,...o.notification_preferences});
             if(o.app_settings)             setAppPrefs({...DEFAULT_APP,...o.app_settings});
-          } else {
-            const{data:fp}=await supabase.from('profiles')
-              .select('display_name,company_name').eq('id',session.user.id).single();
-            if(fp) setDisplayName((fp as any).company_name||(fp as any).display_name||'');
           }
         }catch(e){console.error('[settings load]',e);}
         finally{setLoading(false);}
@@ -284,11 +280,9 @@ import React, {
     const saveNotifPrefs = useCallback(async(prefs: NotifPrefs)=>{
       setNotifPrefs(prefs);
       try{
-        const{data:{session}}=await supabase.auth.getSession();
-        if(!session)return;
-        await supabase.from('organizers').update({notification_preferences:prefs}).eq('id',session.user.id);
-        // Fallback profiles
-        await supabase.from('profiles').update({notification_preferences:prefs}).eq('id',session.user.id);
+        const organizerId=await getCurrentOrganizerId();
+        if(!organizerId)return;
+        await supabase.from('organizers').update({notification_preferences:prefs}).eq('id',organizerId);
       }catch(e){console.error('[notif prefs]',e);}
     },[]);
   
@@ -296,9 +290,9 @@ import React, {
     const saveAppPrefs = useCallback(async(prefs: AppPrefs)=>{
       setAppPrefs(prefs);
       try{
-        const{data:{session}}=await supabase.auth.getSession();
-        if(!session)return;
-        await supabase.from('organizers').update({app_settings:prefs}).eq('id',session.user.id);
+        const organizerId=await getCurrentOrganizerId();
+        if(!organizerId)return;
+        await supabase.from('organizers').update({app_settings:prefs}).eq('id',organizerId);
       }catch(e){console.error('[app prefs]',e);}
     },[]);
   

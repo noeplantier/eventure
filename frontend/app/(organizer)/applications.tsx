@@ -21,6 +21,7 @@ import { Ionicons }       from '@expo/vector-icons';
 import { SafeAreaView }   from 'react-native-safe-area-context';
 import { useRouter }      from 'expo-router';
 import { supabase }       from '@/lib/supabase';
+import { getCurrentOrganizerId } from '@/services/api';
 
 /* ─── Palette (identique dashboard) ───────────────────────────────────── */
 const { width: SW, height: SH } = Dimensions.get('window');
@@ -503,9 +504,8 @@ export default function ApplicationsScreen() {
   const load=useCallback(async(silent=false)=>{
     if(!silent) setLoading(true);
     try{
-      const{data:{session}}=await supabase.auth.getSession();
-      if(!session){setApps([]);return;}
-      const uid=session.user.id;
+      const uid=await getCurrentOrganizerId();
+      if(!uid){setApps([]);return;}
 
       // Essaie la vue
       const vr=await supabase.from('v_application_details').select('*')
