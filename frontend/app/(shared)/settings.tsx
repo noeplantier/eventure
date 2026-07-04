@@ -33,28 +33,31 @@ import React, {
   import { SafeAreaView }   from 'react-native-safe-area-context';
   import { useRouter }      from 'expo-router';
   import { supabase }       from '@/lib/supabase';
+  import { getCurrentOrganizerId } from '@/services/api';
+  import { AURA }           from '@/constants/aura-theme';
+  import Aura               from '@/components/Aura';
   
-  /* ─── Palette ADN dashboard ────────────────────────────────────────────── */
+  /* ─── Palette Aura — dark, futuristic, professionnel ───────────────────── */
   const { width: SW } = Dimensions.get('window');
-  const BG    = '#020A06';
-  const GREEN = '#00D97E';
-  const GOLD  = '#F5C842';
+  const BG    = AURA.bg;
+  const GREEN = AURA.primary;
+  const GOLD  = AURA.warning;
   const EDGE  = 20;
   
   const T = {
-    white   : '#FFFFFF',
-    muted   : 'rgba(255,255,255,0.50)',
-    faint   : 'rgba(255,255,255,0.14)',
-    surf    : 'rgba(255,255,255,0.045)',
-    border  : 'rgba(0,217,126,0.12)',
-    borderHi: 'rgba(0,217,126,0.30)',
-    greenDim: 'rgba(0,217,126,0.12)',
-    goldDim : 'rgba(245,200,66,0.12)',
-    navy    : '#0A2218',
-    amber   : '#F59E0B',
-    red     : '#EF4444',
-    blue    : '#60A5FA',
-    purple  : '#A78BFA',
+    white   : AURA.text,
+    muted   : AURA.textSub,
+    faint   : AURA.textMuted,
+    surf    : AURA.surfaceAlt,
+    border  : AURA.border,
+    borderHi: AURA.primaryBorder,
+    greenDim: AURA.primaryGhost,
+    goldDim : AURA.warningGhost,
+    navy    : AURA.surface,
+    amber   : AURA.warning,
+    red     : AURA.danger,
+    blue    : AURA.cyan,
+    purple  : AURA.secondary,
   } as const;
   
   const APP_VERSION = '2.0.0';
@@ -91,16 +94,16 @@ import React, {
   
   /* ─── Particle Background (identique dashboard) ────────────────────────── */
   const rnd = (a: number, b: number) => a + Math.random() * (b - a);
-  const PCOLS = ['#00D97E','rgba(0,217,126,0.4)','#F5C842','rgba(245,200,66,0.32)','rgba(255,255,255,0.16)'];
+  const PCOLS = [AURA.primary,'rgba(129,140,248,0.4)',AURA.warning,'rgba(251,191,36,0.32)','rgba(255,255,255,0.16)'];
   const PTS   = Array.from({length:20},(_,i)=>({
     id:i, x:rnd(0,SW), y:rnd(0,920),
     sz:rnd(0.8,2.6), col:PCOLS[i%PCOLS.length], op:0.04+(i%6)*0.03,
   }));
   const ParticleBg = memo(() => (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <LinearGradient colors={[BG,'#041208',BG]} style={StyleSheet.absoluteFill}/>
-      <View style={{position:'absolute',top:'7%',left:'10%',width:SW*.72,height:SW*.72,borderRadius:SW*.36,backgroundColor:'rgba(0,217,126,0.025)'}}/>
-      <View style={{position:'absolute',bottom:'8%',right:'-18%',width:SW*.6,height:SW*.6,borderRadius:SW*.3,backgroundColor:'rgba(245,200,66,0.02)'}}/>
+      <LinearGradient colors={[BG,AURA.bgElevated,BG]} style={StyleSheet.absoluteFill}/>
+      <View style={{position:'absolute',top:'7%',left:'10%',width:SW*.72,height:SW*.72,borderRadius:SW*.36,backgroundColor:'rgba(129,140,248,0.05)'}}/>
+      <View style={{position:'absolute',bottom:'8%',right:'-18%',width:SW*.6,height:SW*.6,borderRadius:SW*.3,backgroundColor:'rgba(251,191,36,0.04)'}}/>
       {PTS.map(p=><View key={p.id} style={{position:'absolute',left:p.x,top:p.y,width:p.sz,height:p.sz,borderRadius:p.sz/2,backgroundColor:p.col,opacity:p.op}}/>)}
     </View>
   ));
@@ -213,8 +216,8 @@ import React, {
         <SafeAreaView edges={['top']}>
           <View style={{flexDirection:'row',alignItems:'center',gap:9,
             paddingHorizontal:15,paddingVertical:12,marginTop:8,borderRadius:15,
-            backgroundColor:ok?'rgba(0,217,126,0.18)':'rgba(239,68,68,0.18)',
-            borderWidth:1,borderColor:ok?T.borderHi:'rgba(239,68,68,0.35)'}}>
+            backgroundColor:ok?'rgba(129,140,248,0.20)':AURA.dangerGhost,
+            borderWidth:1,borderColor:ok?T.borderHi:'rgba(248,113,113,0.40)'}}>
             <Ionicons name={ok?'checkmark-circle':'close-circle'} size={17} color={ok?GREEN:T.red}/>
             <Text style={{color:T.white,fontSize:13,fontWeight:'700',flex:1}}>{msg}</Text>
           </View>
@@ -257,12 +260,11 @@ import React, {
     useEffect(()=>{
       (async()=>{
         try{
-          const{data:{session}}=await supabase.auth.getSession();
-          if(!session)return;
-          setEmail(session.user.email??'');
+          const organizerId=await getCurrentOrganizerId();
+          if(!organizerId)return;
           const{data:org}=await supabase.from('organizers')
             .select('contact_name,company_name,is_pro,verified,notification_preferences,app_settings')
-            .eq('id',session.user.id).single();
+            .eq('id',organizerId).single();
           if(org){
             const o=org as any;
             setDisplayName(o.company_name||o.contact_name||'');
@@ -270,10 +272,6 @@ import React, {
             setVerified(o.verified??false);
             if(o.notification_preferences) setNotifPrefs({...DEFAULT_NOTIF,...o.notification_preferences});
             if(o.app_settings)             setAppPrefs({...DEFAULT_APP,...o.app_settings});
-          } else {
-            const{data:fp}=await supabase.from('profiles')
-              .select('display_name,company_name').eq('id',session.user.id).single();
-            if(fp) setDisplayName((fp as any).company_name||(fp as any).display_name||'');
           }
         }catch(e){console.error('[settings load]',e);}
         finally{setLoading(false);}
@@ -284,11 +282,9 @@ import React, {
     const saveNotifPrefs = useCallback(async(prefs: NotifPrefs)=>{
       setNotifPrefs(prefs);
       try{
-        const{data:{session}}=await supabase.auth.getSession();
-        if(!session)return;
-        await supabase.from('organizers').update({notification_preferences:prefs}).eq('id',session.user.id);
-        // Fallback profiles
-        await supabase.from('profiles').update({notification_preferences:prefs}).eq('id',session.user.id);
+        const organizerId=await getCurrentOrganizerId();
+        if(!organizerId)return;
+        await supabase.from('organizers').update({notification_preferences:prefs}).eq('id',organizerId);
       }catch(e){console.error('[notif prefs]',e);}
     },[]);
   
@@ -296,9 +292,9 @@ import React, {
     const saveAppPrefs = useCallback(async(prefs: AppPrefs)=>{
       setAppPrefs(prefs);
       try{
-        const{data:{session}}=await supabase.auth.getSession();
-        if(!session)return;
-        await supabase.from('organizers').update({app_settings:prefs}).eq('id',session.user.id);
+        const organizerId=await getCurrentOrganizerId();
+        if(!organizerId)return;
+        await supabase.from('organizers').update({app_settings:prefs}).eq('id',organizerId);
       }catch(e){console.error('[app prefs]',e);}
     },[]);
   
@@ -414,7 +410,7 @@ import React, {
                       </Text>
                       {isPro&&(
                         <View style={{paddingHorizontal:7,paddingVertical:2,borderRadius:7,
-                          backgroundColor:T.goldDim,borderWidth:1,borderColor:'rgba(245,200,66,0.28)'}}>
+                          backgroundColor:T.goldDim,borderWidth:1,borderColor:'rgba(251,191,36,0.30)'}}>
                           <Text style={{color:GOLD,fontSize:8,fontWeight:'900',letterSpacing:0.8}}>PRO</Text>
                         </View>
                       )}
@@ -431,13 +427,13 @@ import React, {
                 <SettingRow icon="star-outline" label="Passer en Pro"
                   sublabel={isPro?'Abonnement actif':'Débloque les fonctionnalités avancées'}
                   color={GOLD}
-                  value={isPro?'Actif':''}
+                  value={isPro?'Actif':undefined}
                   onPress={()=>showToast(true,'Abonnement Pro bientôt disponible')}/>
                 <Div/>
                 <SettingRow icon="shield-checkmark-outline" label="Vérification d'agence"
                   sublabel={verified?'Votre agence est vérifiée':'Obtenez le badge vérifié'}
                   color={verified?GREEN:T.amber}
-                  value={verified?'Vérifié':''}
+                  value={verified?'Vérifié':undefined}
                   onPress={()=>showToast(false,'Contactez support@eventure.fr pour la vérification')}/>
               </Card>
   
@@ -577,7 +573,7 @@ import React, {
                       style={{height:44,borderRadius:12,overflow:'hidden',
                         opacity:saving?0.6:1}}
                       onPress={changePassword} disabled={saving} activeOpacity={0.85}>
-                      <LinearGradient colors={[T.amber,'#D97706']} style={{flex:1,flexDirection:'row',
+                      <LinearGradient colors={[T.amber,AURA.warning]} style={{flex:1,flexDirection:'row',
                         alignItems:'center',justifyContent:'center',gap:8}}>
                         {saving
                           ?<ActivityIndicator color={BG} size="small"/>
@@ -670,8 +666,8 @@ import React, {
               <TouchableOpacity
                 style={{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:9,
                   paddingVertical:15,borderRadius:16,
-                  backgroundColor:'rgba(239,68,68,0.08)',
-                  borderWidth:StyleSheet.hairlineWidth,borderColor:'rgba(239,68,68,0.22)'}}
+                  backgroundColor:AURA.dangerGhost,
+                  borderWidth:StyleSheet.hairlineWidth,borderColor:'rgba(248,113,113,0.30)'}}
                 onPress={signOut} activeOpacity={0.78}>
                 <Ionicons name="log-out-outline" size={17} color={T.red}/>
                 <Text style={{color:T.red,fontSize:14,fontWeight:'700'}}>Se déconnecter</Text>

@@ -1,6 +1,6 @@
 /**
- * app/(organizer)/dashboard.tsx — EVENTURE v3
- * Design system : Indigo Light (#F8FAFC bg, #6366F1 primary)
+ * app/(organizer)/dashboard.tsx — EVENTURE v4
+ * Design system : Aura (dark, futuristic, professionnel — halos interactifs)
  * Sections : Stats · Candidatures urgentes · Événements · Missions du jour · Échéances
  */
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
@@ -14,27 +14,29 @@ import { Ionicons }       from '@expo/vector-icons';
 import { SafeAreaView }   from 'react-native-safe-area-context';
 import { useRouter }      from 'expo-router';
 import { supabase }       from '@/lib/supabase';
+import { getCurrentOrganizerId } from '@/services/api';
+import { AURA } from '@/constants/aura-theme';
+import Aura from '@/components/Aura';
 
 /* ─── Design tokens ─────────────────────────────────────────────────────── */
 const { width: SW } = Dimensions.get('window');
-const BG      = '#F8FAFC';
-const PRIMARY = '#6366F1';
-const P_LIGHT = '#EEF2FF';
-const P_GHOST = 'rgba(99,102,241,0.08)';
-const PURPLE  = '#8B5CF6';
-const SUCCESS = '#10B981';
-const WARNING = '#F59E0B';
-const DANGER  = '#EF4444';
-const BLUE    = '#3B82F6';
+const BG      = AURA.bg;
+const PRIMARY = AURA.primary;
+const P_GHOST = AURA.primaryGhost;
+const PURPLE  = AURA.secondary;
+const CYAN    = AURA.cyan;
+const SUCCESS = AURA.success;
+const WARNING = AURA.warning;
+const DANGER  = AURA.danger;
 const EDGE    = 16;
 
 const C = {
-  text:      '#111827',
-  textSub:   '#6B7280',
-  textMuted: '#9CA3AF',
-  border:    '#E5E7EB',
-  surface:   '#FFFFFF',
-  surfaceAlt:'#F1F5F9',
+  text:      AURA.text,
+  textSub:   AURA.textSub,
+  textMuted: AURA.textMuted,
+  border:    AURA.border,
+  surface:   AURA.surface,
+  surfaceAlt:AURA.surfaceAlt,
 } as const;
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
@@ -53,14 +55,14 @@ const daysUntil = (iso: string) =>
   Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000);
 
 const STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
-  published: { label: 'Actif',     color: SUCCESS, bg: 'rgba(16,185,129,0.10)' },
-  draft:     { label: 'Brouillon', color: WARNING, bg: 'rgba(245,158,11,0.10)' },
+  published: { label: 'Actif',     color: SUCCESS, bg: AURA.successGhost },
+  draft:     { label: 'Brouillon', color: WARNING, bg: AURA.warningGhost },
   done:      { label: 'Terminé',   color: C.textMuted, bg: C.surfaceAlt },
-  cancelled: { label: 'Annulé',    color: DANGER,  bg: 'rgba(239,68,68,0.10)' },
+  cancelled: { label: 'Annulé',    color: DANGER,  bg: AURA.dangerGhost },
 };
 const TYPE_COLORS: Record<string, string> = {
-  Festival: SUCCESS, Gala: '#F59E0B', Conférence: BLUE,
-  Mariage: '#EC4899', Séminaire: PURPLE, Concert: DANGER,
+  Festival: SUCCESS, Gala: WARNING, Conférence: CYAN,
+  Mariage: '#F472B6', Séminaire: PURPLE, Concert: DANGER,
 };
 
 /* ─── Stat Card ──────────────────────────────────────────────────────────── */
@@ -77,20 +79,21 @@ const StatCard = memo(({ icon, value, label, color, bg, trend }: {
   }, [value]);
 
   return (
-    <View style={[st.card, { shadowColor: color }]}>
-      <View style={[st.iconWrap, { backgroundColor: bg }]}>
-        <Ionicons name={icon as any} size={18} color={color}/>
+    <Aura color={`${color}73`} radius={16} style={{ flex: 1 }}>
+      <View style={st.card}>
+        <View style={[st.iconWrap, { backgroundColor: bg }]}>
+          <Ionicons name={icon as any} size={18} color={color}/>
+        </View>
+        <Text style={[st.value, { color }]}>{display}</Text>
+        <Text style={st.label}>{label}</Text>
+        {trend ? <Text style={[st.trend, { color }]}>{trend}</Text> : null}
       </View>
-      <Text style={[st.value, { color }]}>{display}</Text>
-      <Text style={st.label}>{label}</Text>
-      {trend ? <Text style={[st.trend, { color }]}>{trend}</Text> : null}
-    </View>
+    </Aura>
   );
 });
 const st = StyleSheet.create({
-  card:    { flex: 1, backgroundColor: C.surface, borderRadius: 14, padding: 14, gap: 6,
-             borderWidth: 1, borderColor: C.border,
-             shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 },
+  card:    { backgroundColor: C.surface, borderRadius: 16, padding: 14, gap: 6,
+             borderWidth: 1, borderColor: C.border },
   iconWrap:{ width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   value:   { fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
   label:   { fontSize: 11, color: C.textSub, fontWeight: '500', lineHeight: 15 },
@@ -113,34 +116,35 @@ const EventCard = memo(({ evt, onPress }: { evt: DashEvent; onPress: () => void 
   const days = daysUntil(evt.date_start);
   const urgency = days <= 2 ? DANGER : days <= 7 ? WARNING : SUCCESS;
   return (
-    <TouchableOpacity style={ec.card} onPress={onPress} activeOpacity={0.82}>
-      <LinearGradient colors={[`${tc}15`, `${tc}05`]} style={StyleSheet.absoluteFill}/>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <View style={[ec.typeIcon, { backgroundColor: `${tc}18` }]}>
-          <Ionicons name="calendar-outline" size={16} color={tc}/>
+    <Aura color={`${tc}66`} radius={16} onPress={onPress} style={{ marginRight: 12 }}>
+      <View style={ec.card}>
+        <LinearGradient colors={[`${tc}22`, `${tc}05`]} style={StyleSheet.absoluteFill}/>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <View style={[ec.typeIcon, { backgroundColor: `${tc}22` }]}>
+            <Ionicons name="calendar-outline" size={16} color={tc}/>
+          </View>
+          <StatusBadge status={evt.status}/>
         </View>
-        <StatusBadge status={evt.status}/>
+        <Text style={ec.title} numberOfLines={2}>{evt.title}</Text>
+        <View style={{ gap: 4 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <Ionicons name="location-outline" size={11} color={C.textMuted}/>
+            <Text style={ec.meta} numberOfLines={1}>{evt.location.split(',')[0]}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <Ionicons name="time-outline" size={11} color={urgency}/>
+            <Text style={[ec.meta, { color: urgency, fontWeight: '700' }]}>
+              {days <= 0 ? "Aujourd'hui" : days === 1 ? 'Demain' : `J-${days}`}
+            </Text>
+          </View>
+        </View>
       </View>
-      <Text style={ec.title} numberOfLines={2}>{evt.title}</Text>
-      <View style={{ gap: 4 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-          <Ionicons name="location-outline" size={11} color={C.textMuted}/>
-          <Text style={ec.meta} numberOfLines={1}>{evt.location.split(',')[0]}</Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-          <Ionicons name="time-outline" size={11} color={urgency}/>
-          <Text style={[ec.meta, { color: urgency, fontWeight: '700' }]}>
-            {days <= 0 ? "Aujourd'hui" : days === 1 ? 'Demain' : `J-${days}`}
-          </Text>
-        </View>
-      </View>
-    </TouchableOpacity>
+    </Aura>
   );
 });
 const ec = StyleSheet.create({
-  card:    { width: 170, backgroundColor: C.surface, borderRadius: 14, padding: 14, gap: 10,
-             borderWidth: 1, borderColor: C.border, marginRight: 12,
-             shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 3, overflow: 'hidden' },
+  card:    { width: 170, backgroundColor: C.surface, borderRadius: 16, padding: 14, gap: 10,
+             borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
   typeIcon:{ width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   title:   { fontSize: 13, fontWeight: '700', color: C.text, lineHeight: 18 },
   meta:    { fontSize: 11, color: C.textMuted, flex: 1 },
@@ -176,32 +180,35 @@ const AppCard = memo(({ app, onAccept, onReject }: {
         <Text style={{ color: C.textMuted, fontSize: 10 }}>{daysAgo}j</Text>
       </View>
       <View style={{ flexDirection: 'row', gap: 8 }}>
-        <TouchableOpacity style={[ac.btn, ac.btnDanger]} onPress={onReject} activeOpacity={0.8}>
-          <Ionicons name="close" size={14} color={DANGER}/>
-          <Text style={[ac.btnTxt, { color: DANGER }]}>Refuser</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[ac.btn, ac.btnSuccess, { flex: 1 }]} onPress={onAccept} activeOpacity={0.8}>
-          <Ionicons name="checkmark" size={14} color={SUCCESS}/>
-          <Text style={[ac.btnTxt, { color: SUCCESS }]}>Accepter</Text>
-        </TouchableOpacity>
+        <Aura color={AURA.dangerGlow} radius={8} onPress={onReject} style={{ flex: 0 }}>
+          <View style={[ac.btn, ac.btnDanger]}>
+            <Ionicons name="close" size={14} color={DANGER}/>
+            <Text style={[ac.btnTxt, { color: DANGER }]}>Refuser</Text>
+          </View>
+        </Aura>
+        <Aura color={AURA.successGlow} radius={8} onPress={onAccept} style={{ flex: 1 }}>
+          <View style={[ac.btn, ac.btnSuccess]}>
+            <Ionicons name="checkmark" size={14} color={SUCCESS}/>
+            <Text style={[ac.btnTxt, { color: SUCCESS }]}>Accepter</Text>
+          </View>
+        </Aura>
       </View>
     </View>
   );
 });
 const ac = StyleSheet.create({
-  card:       { backgroundColor: C.surface, borderRadius: 12, padding: 14, gap: 12,
-                borderWidth: 1, borderColor: C.border,
-                shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  card:       { backgroundColor: C.surface, borderRadius: 14, padding: 14, gap: 12,
+                borderWidth: 1, borderColor: C.border },
   avatar:     { width: 44, height: 44, borderRadius: 22 },
-  avatarFb:   { backgroundColor: P_LIGHT, alignItems: 'center', justifyContent: 'center' },
+  avatarFb:   { backgroundColor: P_GHOST, alignItems: 'center', justifyContent: 'center' },
   init:       { color: PRIMARY, fontSize: 16, fontWeight: '800' },
   name:       { fontSize: 14, fontWeight: '700', color: C.text },
-  urgentBadge:{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, backgroundColor: 'rgba(239,68,68,0.10)' },
+  urgentBadge:{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, backgroundColor: AURA.dangerGhost },
   urgentTxt:  { color: DANGER, fontSize: 9, fontWeight: '700' },
-  btn:        { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8,
-                borderRadius: 8, borderWidth: 1 },
-  btnDanger:  { borderColor: 'rgba(239,68,68,0.25)', backgroundColor: 'rgba(239,68,68,0.06)' },
-  btnSuccess: { borderColor: 'rgba(16,185,129,0.25)', backgroundColor: 'rgba(16,185,129,0.06)' },
+  btn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8,
+                borderRadius: 10, borderWidth: 1 },
+  btnDanger:  { borderColor: 'rgba(248,113,113,0.30)', backgroundColor: AURA.dangerGhost },
+  btnSuccess: { borderColor: 'rgba(52,211,153,0.30)', backgroundColor: AURA.successGhost },
   btnTxt:     { fontSize: 12, fontWeight: '700' },
 });
 
@@ -229,7 +236,7 @@ const MissionItem = memo(({ m, isLast }: { m: MissionItem; isLast: boolean }) =>
             <Text style={mi.name} numberOfLines={1}>{m.staff_name}</Text>
             <Text style={mi.evtTitle} numberOfLines={1}>{m.event_title}</Text>
           </View>
-          <View style={{ paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, backgroundColor: `${payColor}15` }}>
+          <View style={{ paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, backgroundColor: `${payColor}22` }}>
             <Text style={{ color: payColor, fontSize: 9, fontWeight: '700' }}>
               {m.payment_status === 'paid' ? 'Payé' : m.payment_status === 'pending' ? 'En attente' : 'Partiel'}
             </Text>
@@ -242,11 +249,11 @@ const MissionItem = memo(({ m, isLast }: { m: MissionItem; isLast: boolean }) =>
 const mi = StyleSheet.create({
   time:     { fontSize: 10, fontWeight: '700', color: PRIMARY, textAlign: 'right', width: 44 },
   dot:      { width: 10, height: 10, borderRadius: 5, backgroundColor: PRIMARY, marginVertical: 4,
-              borderWidth: 2, borderColor: P_LIGHT },
+              borderWidth: 2, borderColor: P_GHOST },
   line:     { flex: 1, width: 2, backgroundColor: C.border, minHeight: 24 },
   content:  { flex: 1, backgroundColor: C.surfaceAlt, borderRadius: 10, padding: 12 },
   avatar:   { width: 34, height: 34, borderRadius: 17 },
-  avatarFb: { backgroundColor: P_LIGHT, alignItems: 'center', justifyContent: 'center' },
+  avatarFb: { backgroundColor: P_GHOST, alignItems: 'center', justifyContent: 'center' },
   init:     { color: PRIMARY, fontSize: 12, fontWeight: '800' },
   name:     { fontSize: 13, fontWeight: '700', color: C.text },
   evtTitle: { fontSize: 11, color: C.textSub },
@@ -256,10 +263,10 @@ const mi = StyleSheet.create({
 const DeadlineCard = memo(({ evt }: { evt: DashEvent }) => {
   const days = daysUntil(evt.date_start);
   const { color, bg, label } = days <= 3
-    ? { color: DANGER, bg: 'rgba(239,68,68,0.08)', label: `${days}j` }
+    ? { color: DANGER, bg: AURA.dangerGhost, label: `${days}j` }
     : days <= 7
-    ? { color: WARNING, bg: 'rgba(245,158,11,0.08)', label: `${days}j` }
-    : { color: BLUE, bg: 'rgba(59,130,246,0.08)', label: `${days}j` };
+    ? { color: WARNING, bg: AURA.warningGhost, label: `${days}j` }
+    : { color: CYAN, bg: AURA.cyanGhost, label: `${days}j` };
 
   return (
     <View style={[dl.card, { borderLeftColor: color }]}>
@@ -275,7 +282,7 @@ const DeadlineCard = memo(({ evt }: { evt: DashEvent }) => {
 });
 const dl = StyleSheet.create({
   card:     { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface,
-              borderRadius: 10, padding: 12, borderLeftWidth: 3,
+              borderRadius: 12, padding: 12, borderLeftWidth: 3,
               borderWidth: 1, borderColor: C.border },
   title:    { fontSize: 13, fontWeight: '700', color: C.text },
   date:     { fontSize: 11, color: C.textSub },
@@ -291,7 +298,7 @@ const SectionHeader = memo(({ title, count, onAll, allLabel = 'Tout voir' }: {
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
       <Text style={{ fontSize: 16, fontWeight: '800', color: C.text }}>{title}</Text>
       {count != null && count > 0 && (
-        <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, backgroundColor: P_LIGHT }}>
+        <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, backgroundColor: P_GHOST }}>
           <Text style={{ color: PRIMARY, fontSize: 11, fontWeight: '800' }}>{count}</Text>
         </View>
       )}
@@ -314,21 +321,21 @@ const Skeleton = memo(() => {
     ]));
     loop.start(); return () => loop.stop();
   }, []);
-  const op = a.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
+  const op = a.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.7] });
   const B = ({ w, h, r = 8 }: { w: number | `${number}%`; h: number; r?: number }) => (
-    <Animated.View style={{ width: w as any, height: h, borderRadius: r, backgroundColor: '#E5E7EB', opacity: op }}/>
+    <Animated.View style={{ width: w as any, height: h, borderRadius: r, backgroundColor: C.surfaceAlt, opacity: op }}/>
   );
   return (
     <View style={{ gap: 16 }}>
       <View style={{ flexDirection: 'row', gap: 10 }}>
-        {[0, 1, 2, 3].map(i => <B key={i} w={(SW - EDGE * 2 - 30) / 4} h={90} r={14}/>)}
+        {[0, 1, 2, 3].map(i => <B key={i} w={(SW - EDGE * 2 - 30) / 4} h={90} r={16}/>)}
       </View>
       <B w="100%" h={14} r={8}/>
       <View style={{ flexDirection: 'row', gap: 12 }}>
-        {[0, 1].map(i => <B key={i} w={170} h={140} r={14}/>)}
+        {[0, 1].map(i => <B key={i} w={170} h={140} r={16}/>)}
       </View>
       <B w="100%" h={14} r={8}/>
-      {[0, 1, 2].map(i => <B key={i} w="100%" h={80} r={12}/>)}
+      {[0, 1, 2].map(i => <B key={i} w="100%" h={80} r={14}/>)}
     </View>
   );
 });
@@ -348,9 +355,8 @@ export default function Dashboard() {
 
   const fetch = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const uid = session.user.id;
+      const uid = await getCurrentOrganizerId();
+      if (!uid) return;
 
       const [orgRes, eventsRes] = await Promise.all([
         supabase.from('organizers').select('display_name,company_name,avatar_url').eq('id', uid).maybeSingle(),
@@ -401,7 +407,6 @@ export default function Dashboard() {
             .order('applied_at', { ascending: false });
 
           const allApps = (apps ?? []) as any[];
-          const pendingIds = allApps.filter(a => a.status === 'pending').map(a => a.staff_id).filter(Boolean);
           const recruitedCount = allApps.filter(a => a.status === 'accepted').length;
 
           // Fetch staff info for pending apps (limit 5)
@@ -460,7 +465,7 @@ export default function Dashboard() {
         setStats({ totalEvents: 0, activeEvents: 0, staffRecruited: 0, activeMissions: 0, urgentDeadlines: 0 });
       }
     } catch (e) {
-      console.error('[dashboard v3]', e);
+      console.error('[dashboard v4]', e);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -472,7 +477,7 @@ export default function Dashboard() {
   // Realtime
   useEffect(() => {
     let alive = true;
-    const ch = supabase.channel(`dash3_${Date.now()}`)
+    const ch = supabase.channel(`dash4_${Date.now()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => { if (alive) fetch(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'applications' }, () => { if (alive) fetch(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'missions' }, () => { if (alive) fetch(); })
@@ -506,18 +511,18 @@ export default function Dashboard() {
             <Text style={ds.dateStr} numberOfLines={1}>{today}</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <TouchableOpacity style={ds.iconBtn} onPress={() => router.push('/(shared)/notifications' as any)} activeOpacity={0.75}>
-              <Ionicons name="notifications-outline" size={20} color={C.text}/>
-              {pendingApps.length > 0 && <View style={ds.notifDot}/>}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={ds.createBtn}
-              onPress={() => router.push('/(organizer)/create-event' as any)}
-              activeOpacity={0.82}
-            >
-              <Ionicons name="add" size={18} color="#FFFFFF"/>
-              <Text style={ds.createTxt}>Créer</Text>
-            </TouchableOpacity>
+            <Aura color={AURA.primaryGlow} radius={12} onPress={() => router.push('/(shared)/notifications' as any)}>
+              <View style={ds.iconBtn}>
+                <Ionicons name="notifications-outline" size={20} color={C.text}/>
+                {pendingApps.length > 0 && <View style={ds.notifDot}/>}
+              </View>
+            </Aura>
+            <Aura color={AURA.primaryGlow} radius={12} onPress={() => router.push('/(organizer)/create-event' as any)}>
+              <View style={ds.createBtn}>
+                <Ionicons name="add" size={18} color="#FFFFFF"/>
+                <Text style={ds.createTxt}>Créer</Text>
+              </View>
+            </Aura>
           </View>
         </View>
 
@@ -532,16 +537,16 @@ export default function Dashboard() {
             <View style={{ gap: 10 }}>
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 <StatCard icon="calendar-outline" value={stats.activeEvents} label="Événements actifs"  color={PRIMARY}  bg={P_GHOST}/>
-                <StatCard icon="people-outline"   value={stats.staffRecruited} label="Staffs recrutés" color={PURPLE}   bg="rgba(139,92,246,0.08)"/>
+                <StatCard icon="people-outline"   value={stats.staffRecruited} label="Staffs recrutés" color={PURPLE}   bg={AURA.secondaryGhost}/>
               </View>
               <View style={{ flexDirection: 'row', gap: 10 }}>
-                <StatCard icon="clipboard-outline" value={stats.activeMissions} label="Missions en cours" color={SUCCESS} bg="rgba(16,185,129,0.08)"/>
+                <StatCard icon="clipboard-outline" value={stats.activeMissions} label="Missions en cours" color={SUCCESS} bg={AURA.successGhost}/>
                 <StatCard
                   icon="warning-outline"
                   value={stats.urgentDeadlines}
                   label="Échéances urgentes"
                   color={stats.urgentDeadlines > 0 ? DANGER : C.textMuted}
-                  bg={stats.urgentDeadlines > 0 ? 'rgba(239,68,68,0.08)' : C.surfaceAlt}
+                  bg={stats.urgentDeadlines > 0 ? AURA.dangerGhost : C.surfaceAlt}
                   trend={stats.urgentDeadlines > 0 ? '< 7 jours' : undefined}
                 />
               </View>
@@ -584,16 +589,14 @@ export default function Dashboard() {
                       onPress={() => router.push({ pathname: '/(organizer)/event/[id]', params: { id: evt.id } } as any)}
                     />
                   ))}
-                  <TouchableOpacity
-                    style={[ec.card, { justifyContent: 'center', alignItems: 'center', width: 140 }]}
-                    onPress={() => router.push('/(organizer)/events' as any)}
-                    activeOpacity={0.75}
-                  >
-                    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: P_LIGHT, alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-                      <Ionicons name="arrow-forward" size={18} color={PRIMARY}/>
+                  <Aura color={AURA.primaryGlow} radius={16} onPress={() => router.push('/(organizer)/events' as any)}>
+                    <View style={[ec.card, { justifyContent: 'center', alignItems: 'center', width: 140 }]}>
+                      <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: P_GHOST, alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                        <Ionicons name="arrow-forward" size={18} color={PRIMARY}/>
+                      </View>
+                      <Text style={{ color: PRIMARY, fontSize: 12, fontWeight: '700', textAlign: 'center' }}>Voir tous</Text>
                     </View>
-                    <Text style={{ color: PRIMARY, fontSize: 12, fontWeight: '700', textAlign: 'center' }}>Voir tous</Text>
-                  </TouchableOpacity>
+                  </Aura>
                 </ScrollView>
               </View>
             )}
@@ -606,7 +609,7 @@ export default function Dashboard() {
                   count={todayMissions.length}
                   onAll={() => router.push('/(organizer)/missions' as any)}
                 />
-                <View style={{ backgroundColor: C.surface, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: C.border }}>
+                <View style={{ backgroundColor: C.surface, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: C.border }}>
                   {todayMissions.map((m, i) => (
                     <MissionItem key={m.id} m={m} isLast={i === todayMissions.length - 1}/>
                   ))}
@@ -627,7 +630,7 @@ export default function Dashboard() {
             {/* ── EMPTY STATE ── */}
             {stats.totalEvents === 0 && (
               <View style={{ alignItems: 'center', paddingVertical: 52, gap: 16 }}>
-                <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: P_LIGHT, alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: P_GHOST, alignItems: 'center', justifyContent: 'center' }}>
                   <Ionicons name="rocket-outline" size={38} color={PRIMARY}/>
                 </View>
                 <Text style={{ fontSize: 20, fontWeight: '800', color: C.text, textAlign: 'center' }}>
@@ -636,14 +639,11 @@ export default function Dashboard() {
                 <Text style={{ fontSize: 14, color: C.textSub, textAlign: 'center', lineHeight: 20 }}>
                   Créez un événement, publiez-le{'\n'}et recrutez votre équipe en 5 minutes.
                 </Text>
-                <TouchableOpacity
-                  style={{ backgroundColor: PRIMARY, paddingHorizontal: 28, paddingVertical: 14, borderRadius: 12,
-                           shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 }}
-                  onPress={() => router.push('/(organizer)/create-event' as any)}
-                  activeOpacity={0.85}
-                >
-                  <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 15 }}>+ Créer un événement</Text>
-                </TouchableOpacity>
+                <Aura color={AURA.primaryGlow} radius={12} onPress={() => router.push('/(organizer)/create-event' as any)}>
+                  <View style={{ backgroundColor: PRIMARY, paddingHorizontal: 28, paddingVertical: 14, borderRadius: 12 }}>
+                    <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 15 }}>+ Créer un événement</Text>
+                  </View>
+                </Aura>
               </View>
             )}
 
@@ -663,6 +663,6 @@ const ds = StyleSheet.create({
   notifDot:  { position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: DANGER,
                borderWidth: 1.5, borderColor: BG },
   createBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: PRIMARY, paddingHorizontal: 14, paddingVertical: 10,
-               borderRadius: 12, shadowColor: PRIMARY, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
+               borderRadius: 12 },
   createTxt: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
 });

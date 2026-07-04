@@ -28,6 +28,7 @@ export interface User {
   following_count:     number;
   films_seen_count:    number;
   reviews_count:       number;
+  staff_id?:           string | null; // lien réel vers public.staff.id (via app_users)
 }
 
 export interface SeenFilm {
@@ -35,11 +36,9 @@ export interface SeenFilm {
   watched_at: string;
 }
 
-const PROFILE_COLS = [
-  'id','username','display_name','avatar_url','bio','role',
-  'location','website','is_verified','is_pro','is_industry_contact',
-  'followers_count','following_count','films_seen_count',
-].join(',');
+// app_users = table réelle d'identité staff/organisateur (id, name, pin, role, staff_id, venue, avatar_url, color)
+// L'ancienne table `profiles` (Universe) n'existe pas dans ce projet Supabase.
+const APP_USER_COLS = 'id,name,role,staff_id,venue,avatar_url,color';
 
 // ─── STORAGE — SecureStore / localStorage selon la plateforme ────────────────
 const DEVICE_KEY = 'universe_device_uuid';
@@ -74,35 +73,55 @@ export async function getDeviceId(): Promise<string> {
   return id;
 }
 
+/** Résout le staff.id réel lié à cet appareil (via app_users.staff_id), ou null si non lié. */
+export async function getCurrentStaffId(): Promise<string | null> {
+  const deviceId = await getDeviceId();
+  try {
+    const { data } = await supabase.from('app_users').select('staff_id').eq('id', deviceId).single();
+    return data?.staff_id ?? null;
+  } catch { return null; }
+}
+
+/** Résout l'organizers.id réel lié à cet appareil (via app_users.organizer_id), ou null si non lié. */
+export async function getCurrentOrganizerId(): Promise<string | null> {
+  const deviceId = await getDeviceId();
+  try {
+    const { data } = await supabase.from('app_users').select('organizer_id').eq('id', deviceId).single();
+    return data?.organizer_id ?? null;
+  } catch { return null; }
+}
+
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 function rowToUser(row: Record<string, any>): User {
   return {
-    id:                  String(row.id          ?? ''),
-    username:            String(row.username     ?? ''),
-    display_name:        String(row.display_name ?? row.username ?? ''),
+    id:                  String(row.id   ?? ''),
+    username:            String(row.name ?? ''),
+    display_name:        String(row.name ?? ''),
     email:               '',
-    avatar_url:          String(row.avatar_url   ?? ''),
-    bio:                 String(row.bio           ?? ''),
-    role:                String(row.role          ?? 'creator'),
-    location:            String(row.location      ?? ''),
-    website:             String(row.website       ?? ''),
-    is_verified:         Boolean(row.is_verified),
-    is_pro:              Boolean(row.is_pro),
-    is_industry_contact: Boolean(row.is_industry_contact),
-    followers_count:     Number(row.followers_count  ?? 0),
-    following_count:     Number(row.following_count  ?? 0),
-    films_seen_count:    Number(row.films_seen_count ?? 0),
-    reviews_count:       Number(row.reviews_count    ?? 0),
+    avatar_url:          String(row.avatar_url ?? ''),
+    bio:                 '',
+    role:                String(row.role ?? 'staff'),
+    location:            String(row.venue ?? ''),
+    website:             '',
+    is_verified:         false,
+    is_pro:              false,
+    is_industry_contact: false,
+    followers_count:     0,
+    following_count:     0,
+    films_seen_count:    0,
+    reviews_count:       0,
+    staff_id:            row.staff_id ?? null,
   };
 }
 
-/** User minimal basé sur l'UUID device (avant fetch/création du profil) */
+/** User minimal basé sur l'UUID device (aucun app_users lié à cet appareil) */
 function localUser(deviceId: string): User {
   return {
-    id: deviceId, username: '', display_name: 'Cinéphile', email: '',
-    avatar_url: '', bio: '', role: 'creator', location: '', website: '',
+    id: deviceId, username: '', display_name: 'Invité', email: '',
+    avatar_url: '', bio: '', role: 'staff', location: '', website: '',
     is_verified: false, is_pro: false, is_industry_contact: false,
     followers_count: 0, following_count: 0, films_seen_count: 0, reviews_count: 0,
+    staff_id: null,
   };
 }
 
@@ -125,27 +144,15 @@ export const authAPI = {
   async initSession(): Promise<{ user: User; token: null }> {
     const deviceId = await getDeviceId();
 
-    // Lecture profil (RLS publique, clé anon)
+    // Lecture du profil app_users lié à cet appareil (RLS publique, clé anon).
+    // Pas d'auto-création : app_users est une table de vrais comptes (PIN + staff_id),
+    // pas un profil jetable — un device non lié reste en fallback local.
     try {
-      const { data, error } = await supabase
-        .from('profiles').select(PROFILE_COLS).eq('id', deviceId).single();
-
+      const { data } = await supabase
+        .from('app_users').select(APP_USER_COLS).eq('id', deviceId).single();
       if (data) return { user: rowToUser(data), token: null };
+    } catch { /* ignore réseau / pas de ligne */ }
 
-      // Profil absent → insertion avec la clé anon (RLS WITH CHECK true)
-      if (error?.code === 'PGRST116') {
-        const username = `user_${deviceId.replace(/-/g, '').slice(0, 8)}`;
-        await supabase.from('profiles').insert({
-          id: deviceId, username, display_name: 'Cinéphile', role: 'creator',
-          films_seen_count: 0, followers_count: 0, following_count: 0,
-        });
-        const { data: created } = await supabase
-          .from('profiles').select(PROFILE_COLS).eq('id', deviceId).single();
-        if (created) return { user: rowToUser(created), token: null };
-      }
-    } catch { /* ignore réseau */ }
-
-    // Fallback local si Supabase injoignable
     return { user: localUser(deviceId), token: null };
   },
 
@@ -153,7 +160,7 @@ export const authAPI = {
   async me(): Promise<User | null> {
     const deviceId = await getDeviceId();
     try {
-      const { data } = await supabase.from('profiles').select(PROFILE_COLS).eq('id', deviceId).single();
+      const { data } = await supabase.from('app_users').select(APP_USER_COLS).eq('id', deviceId).single();
       return data ? rowToUser(data) : null;
     } catch { return null; }
   },
@@ -169,9 +176,16 @@ export const authAPI = {
     uid: string,
     patch: Partial<Omit<User, 'id'|'email'|'reviews_count'>>,
   ): Promise<User | null> {
-    const { error } = await supabase.from('profiles').update(patch).eq('id', uid);
+    const dbPatch: Record<string, any> = {};
+    if (patch.display_name !== undefined) dbPatch.name       = patch.display_name;
+    if (dbPatch.name === undefined && patch.username !== undefined) dbPatch.name = patch.username;
+    if (patch.avatar_url   !== undefined) dbPatch.avatar_url = patch.avatar_url;
+    if (patch.location     !== undefined) dbPatch.venue      = patch.location;
+    if (patch.role         !== undefined) dbPatch.role       = patch.role;
+
+    const { error } = await supabase.from('app_users').update(dbPatch).eq('id', uid);
     if (error) { console.warn('[api] updateProfile:', error.message); return null; }
-    const { data } = await supabase.from('profiles').select(PROFILE_COLS).eq('id', uid).single();
+    const { data } = await supabase.from('app_users').select(APP_USER_COLS).eq('id', uid).single();
     return data ? rowToUser(data) : null;
   },
 
@@ -212,13 +226,13 @@ export const seenAPI = {
 export const profileAPI = {
   async getById(uid: string): Promise<User | null> {
     try {
-      const { data } = await supabase.from('profiles').select(PROFILE_COLS).eq('id', uid).single();
+      const { data } = await supabase.from('app_users').select(APP_USER_COLS).eq('id', uid).single();
       return data ? rowToUser(data) : null;
     } catch { return null; }
   },
   async getByUsername(username: string): Promise<User | null> {
     try {
-      const { data } = await supabase.from('profiles').select(PROFILE_COLS).eq('username', username).single();
+      const { data } = await supabase.from('app_users').select(APP_USER_COLS).eq('name', username).single();
       return data ? rowToUser(data) : null;
     } catch { return null; }
   },

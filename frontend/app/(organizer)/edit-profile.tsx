@@ -33,31 +33,34 @@ import React, {
   import { useRouter }        from 'expo-router';
   import * as ImagePicker     from 'expo-image-picker';
   import { supabase }         from '@/lib/supabase';
+  import { getCurrentOrganizerId } from '@/services/api';
+  import { AURA }             from '@/constants/aura-theme';
+  import Aura                 from '@/components/Aura';
   
-  /* ─── Palette & Layout (identique dashboard + profile) ────────────────── */
+  /* ─── Palette & Layout (Aura — dark, futuristic, professionnel) ────────── */
   const { width: SW } = Dimensions.get('window');
-  const BG    = '#020A06';
-  const GREEN = '#00D97E';
-  const GOLD  = '#F5C842';
+  const BG    = AURA.bg;
+  const GREEN = AURA.primary;
+  const GOLD  = AURA.warning;
   const EDGE  = 20;
   
   const T = {
-    white   : '#FFFFFF',
-    offWhite: 'rgba(255,255,255,0.88)',
-    muted   : 'rgba(255,255,255,0.50)',
-    faint   : 'rgba(255,255,255,0.18)',
-    surf    : 'rgba(255,255,255,0.045)',
-    surfHi  : 'rgba(255,255,255,0.09)',
-    border  : 'rgba(0,217,126,0.12)',
-    borderHi: 'rgba(0,217,126,0.30)',
-    greenDim: 'rgba(0,217,126,0.12)',
-    goldDim : 'rgba(245,200,66,0.12)',
-    goldBd  : 'rgba(245,200,66,0.28)',
-    navy    : '#0A2218',
-    amber   : '#F59E0B',
-    red     : '#EF4444',
-    blue    : '#60A5FA',
-    purple  : '#A78BFA',
+    white   : AURA.text,
+    offWhite: AURA.text,
+    muted   : AURA.textSub,
+    faint   : AURA.textMuted,
+    surf    : AURA.surfaceAlt,
+    surfHi  : AURA.surface,
+    border  : AURA.border,
+    borderHi: AURA.primaryBorder,
+    greenDim: AURA.primaryGhost,
+    goldDim : AURA.warningGhost,
+    goldBd  : 'rgba(251,191,36,0.30)',
+    navy    : AURA.surface,
+    amber   : AURA.warning,
+    red     : AURA.danger,
+    blue    : AURA.cyan,
+    purple  : AURA.secondary,
   } as const;
   
   /* ─── Form state ───────────────────────────────────────────────────────── */
@@ -94,16 +97,16 @@ import React, {
   
   /* ─── Particle background (identique dashboard) ────────────────────────── */
   const rnd = (a: number, b: number) => a + Math.random() * (b - a);
-  const PCOLS = ['#00D97E','rgba(0,217,126,0.4)','#F5C842','rgba(245,200,66,0.32)','rgba(255,255,255,0.16)'];
+  const PCOLS = [AURA.primary,'rgba(129,140,248,0.4)',AURA.warning,'rgba(251,191,36,0.32)','rgba(255,255,255,0.16)'];
   const PTS   = Array.from({length:18},(_,i)=>({
     id:i, x:rnd(0,SW), y:rnd(0,900),
     sz:rnd(0.8,2.4), col:PCOLS[i%PCOLS.length], op:0.04+(i%6)*0.03,
   }));
   const ParticleBg = memo(() => (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <LinearGradient colors={[BG,'#041208',BG]} style={StyleSheet.absoluteFill}/>
-      <View style={{position:'absolute',top:'6%',left:'12%',width:SW*.7,height:SW*.7,borderRadius:SW*.35,backgroundColor:'rgba(0,217,126,0.025)'}}/>
-      <View style={{position:'absolute',bottom:'8%',right:'-18%',width:SW*.6,height:SW*.6,borderRadius:SW*.3,backgroundColor:'rgba(245,200,66,0.02)'}}/>
+      <LinearGradient colors={[BG,AURA.bgElevated,BG]} style={StyleSheet.absoluteFill}/>
+      <View style={{position:'absolute',top:'6%',left:'12%',width:SW*.7,height:SW*.7,borderRadius:SW*.35,backgroundColor:'rgba(129,140,248,0.05)'}}/>
+      <View style={{position:'absolute',bottom:'8%',right:'-18%',width:SW*.6,height:SW*.6,borderRadius:SW*.3,backgroundColor:'rgba(251,191,36,0.04)'}}/>
       {PTS.map(p=><View key={p.id} style={{position:'absolute',left:p.x,top:p.y,width:p.sz,height:p.sz,borderRadius:p.sz/2,backgroundColor:p.col,opacity:p.op}}/>)}
     </View>
   ));
@@ -292,12 +295,12 @@ import React, {
           }}>
             {/* Outer ring */}
             <View style={{position:'absolute',top:-3,left:-3,right:-3,bottom:-3,
-              borderRadius:58,borderWidth:1.5,borderColor:'rgba(0,217,126,0.35)'}}/>
+              borderRadius:58,borderWidth:1.5,borderColor:'rgba(129,140,248,0.45)'}}/>
             {avatarUrl&&!imgErr
               ?<Image source={{uri:avatarUrl}} style={{width:110,height:110,borderRadius:55}}
                   resizeMode="cover" onError={()=>setImgErr(true)}/>
               :<View style={{width:110,height:110,borderRadius:55,
-                  backgroundColor:'rgba(0,217,126,0.08)',
+                  backgroundColor:'rgba(129,140,248,0.12)',
                   borderWidth:1.5,borderColor:T.border,
                   alignItems:'center',justifyContent:'center'}}>
                  <Text style={{color:GREEN,fontSize:34,fontWeight:'900'}}>{init}</Text>
@@ -345,8 +348,8 @@ import React, {
             flexDirection:'row',alignItems:'center',gap:10,
             paddingHorizontal:16,paddingVertical:13,marginTop:8,
             borderRadius:16,
-            backgroundColor:success?'rgba(0,217,126,0.18)':'rgba(239,68,68,0.18)',
-            borderWidth:1,borderColor:success?T.borderHi:'rgba(239,68,68,0.35)',
+            backgroundColor:success?'rgba(129,140,248,0.20)':AURA.dangerGhost,
+            borderWidth:1,borderColor:success?T.borderHi:'rgba(248,113,113,0.40)',
           }}>
             <Ionicons name={success?'checkmark-circle':'close-circle'} size={18}
               color={success?GREEN:T.red}/>
@@ -425,17 +428,15 @@ import React, {
     useEffect(() => {
       (async () => {
         try{
-          const { data:{ session } } = await supabase.auth.getSession();
-          if(!session) return;
-          const uid = session.user.id;
-  
-          // Try organizers first (même que profile.tsx)
+          const uid = await getCurrentOrganizerId();
+          if(!uid) return;
+
           const { data: org } = await supabase
             .from('organizers')
             .select('contact_name,company_name,bio,avatar_url,location,website,phone,is_pro,verified,specialties,event_types,instagram,linkedin')
             .eq('id', uid)
             .single();
-  
+
           if(org) {
             setForm({
               display_name : (org as any).contact_name ?? '',
@@ -450,28 +451,6 @@ import React, {
               specialties  : (org as any).specialties ?? [],
               event_types  : (org as any).event_types ?? [],
             });
-          } else {
-            // Fallback profiles (même que profile.tsx)
-            const { data: fp } = await supabase
-              .from('profiles')
-              .select('display_name,company_name,bio,avatar_url,location,website,phone,specialties,event_types,instagram,linkedin')
-              .eq('id', uid)
-              .single();
-            if(fp) {
-              setForm({
-                display_name : (fp as any).display_name ?? '',
-                company_name : (fp as any).company_name ?? '',
-                bio          : (fp as any).bio ?? '',
-                location     : (fp as any).location ?? '',
-                website      : (fp as any).website ?? '',
-                phone        : (fp as any).phone ?? '',
-                instagram    : (fp as any).instagram ?? '',
-                linkedin     : (fp as any).linkedin ?? '',
-                avatar_url   : (fp as any).avatar_url ?? '',
-                specialties  : (fp as any).specialties ?? [],
-                event_types  : (fp as any).event_types ?? [],
-              });
-            }
           }
         } catch(e) {
           console.error('[edit-profile load]', e);
@@ -497,10 +476,10 @@ import React, {
         const asset = res.assets[0];
         setUploading(true);
         try{
-          const { data:{ session } } = await supabase.auth.getSession();
-          if(!session) throw new Error('Non authentifié');
+          const uid = await getCurrentOrganizerId();
+          if(!uid) throw new Error('Aucun profil organisateur lié à cet appareil');
           const ext    = asset.uri.split('.').pop() ?? 'jpg';
-          const path   = `organizers/${session.user.id}/avatar.${ext}`;
+          const path   = `organizers/${uid}/avatar.${ext}`;
           const blob   = await (await fetch(asset.uri)).blob();
           const { error: upErr } = await supabase.storage
             .from('avatars')
@@ -553,9 +532,8 @@ import React, {
       }
       setSaving(true);
       try{
-        const { data:{ session } } = await supabase.auth.getSession();
-        if(!session) throw new Error('Non authentifié');
-        const uid = session.user.id;
+        const uid = await getCurrentOrganizerId();
+        if(!uid) throw new Error('Aucun profil organisateur lié à cet appareil');
   
         const payload = {
           contact_name : form.display_name.trim(),
@@ -572,34 +550,11 @@ import React, {
           updated_at   : new Date().toISOString(),
         };
   
-        // Try organizers table first
         const { error: orgErr } = await supabase
           .from('organizers')
           .update(payload)
           .eq('id', uid);
-  
-        if(orgErr) {
-          // Fallback: upsert in profiles
-          const fallbackPayload = {
-            id           : uid,
-            display_name : form.display_name.trim(),
-            company_name : form.company_name.trim(),
-            bio          : form.bio.trim() || null,
-            location     : form.location.trim() || null,
-            website      : form.website.trim() || null,
-            phone        : form.phone.trim() || null,
-            instagram    : form.instagram.trim() || null,
-            linkedin     : form.linkedin.trim() || null,
-            avatar_url   : form.avatar_url || null,
-            specialties  : form.specialties,
-            event_types  : form.event_types,
-            updated_at   : new Date().toISOString(),
-          };
-          const { error: pfErr } = await supabase
-            .from('profiles')
-            .upsert(fallbackPayload, { onConflict:'id' });
-          if(pfErr) throw pfErr;
-        }
+        if(orgErr) throw orgErr;
   
         showToast(true, 'Profil mis à jour avec succès');
         // Laisse le toast apparaître puis retourne
@@ -862,8 +817,8 @@ import React, {
               <View style={{gap:10,paddingTop:4}}>
                 <TouchableOpacity
                   style={{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,
-                    paddingVertical:13,borderRadius:14,backgroundColor:'rgba(239,68,68,0.08)',
-                    borderWidth:StyleSheet.hairlineWidth,borderColor:'rgba(239,68,68,0.22)'}}
+                    paddingVertical:13,borderRadius:14,backgroundColor:AURA.dangerGhost,
+                    borderWidth:StyleSheet.hairlineWidth,borderColor:'rgba(248,113,113,0.30)'}}
                   onPress={()=>Alert.alert(
                     'Déconnexion',
                     'Voulez-vous vous déconnecter ?',
@@ -891,7 +846,7 @@ import React, {
             <TouchableOpacity
               style={[s.footerSaveBtn, saving&&{opacity:0.6}]}
               onPress={save} disabled={saving} activeOpacity={0.85}>
-              <LinearGradient colors={[GREEN,'#00A058']} style={s.footerSaveGrad}>
+              <LinearGradient colors={[GREEN,AURA.primaryDeep]} style={s.footerSaveGrad}>
                 {saving
                   ?<ActivityIndicator color={BG} size="small"/>
                   :<>
@@ -917,8 +872,7 @@ import React, {
     navLabel      : { color:T.muted, fontSize:11, fontWeight:'600', letterSpacing:0.2 },
     navTitle      : { color:T.white, fontSize:18, fontWeight:'900', letterSpacing:-0.3 },
     saveBtn       : { flexDirection:'row', alignItems:'center', gap:6, paddingHorizontal:14,
-      paddingVertical:9, borderRadius:12, backgroundColor:GREEN,
-      shadowColor:GREEN, shadowOpacity:0.4, shadowRadius:12 },
+      paddingVertical:9, borderRadius:12, backgroundColor:GREEN },
     footer        : { position:'absolute', bottom:0, left:0, right:0, flexDirection:'row',
       gap:12, paddingHorizontal:EDGE, paddingBottom:Platform.OS==='ios'?34:20, paddingTop:14,
       backgroundColor:`${BG}EE`, borderTopWidth:StyleSheet.hairlineWidth, borderTopColor:T.border },

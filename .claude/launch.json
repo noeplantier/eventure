@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "frontend-web",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd frontend && ./node_modules/.bin/expo start --web --port 8090"],
+      "port": 8090
+    },
+    {
+      "name": "backend-api",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd backend && (python3 -m venv .venv 2>/dev/null; source .venv/bin/activate 2>/dev/null || true; pip install -q -r requirements.txt supabase 'redis[hiredis]' 2>&1 | tail -20; uvicorn main:app --host 0.0.0.0 --port ${PORT:-8001} --reload)"],
+      "port": 8001,
+      "autoPort": true
+    }
+  ]
+}

@@ -6,7 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { COLORS } from '@/constants/theme';
-import { getEvents, getCurrentUser } from '@/lib/api';
+import { getEvents } from '@/lib/api';
+import { authAPI } from '@/services/api';
 
 const T = COLORS;
 
@@ -23,7 +24,7 @@ export default function StaffFeed() {
   const [filter, setFilter]   = useState('all');
 
   const load = async () => {
-    const [u, evts] = await Promise.all([getCurrentUser(), getEvents()]);
+    const [u, evts] = await Promise.all([authAPI.me(), getEvents()]);
     setUser(u); setEvents(evts as any[]); setLoading(false); setRefresh(false);
   };
 
@@ -41,7 +42,7 @@ export default function StaffFeed() {
 
   return (
     <View style={s.root}>
-      <LinearGradient colors={['#0D1A35','#070C17']} style={StyleSheet.absoluteFill}/>
+      <LinearGradient colors={['#141821','#0A0C10']} style={StyleSheet.absoluteFill}/>
       <SafeAreaView edges={['top']}>
         <View style={s.header}>
           <View>
@@ -74,8 +75,8 @@ export default function StaffFeed() {
           return (
             <TouchableOpacity key={e.id} style={s.card} onPress={()=>router.push({ pathname:'/(staff)/mission/[id]', params:{id:e.id} } as any)} activeOpacity={0.88}>
               {e.cover_url && <Image source={{ uri:e.cover_url }} style={s.cardImg} contentFit="cover"/>}
-              {!e.cover_url && <LinearGradient colors={['#0D1A35','#070C17']} style={s.cardImg}/>}
-              <LinearGradient colors={['transparent','rgba(7,12,23,0.95)']} style={StyleSheet.absoluteFillObject}/>
+              {!e.cover_url && <LinearGradient colors={['#141821','#0A0C10']} style={s.cardImg}/>}
+              <LinearGradient colors={['transparent','rgba(10,12,16,0.95)']} style={StyleSheet.absoluteFillObject}/>
 
               <View style={s.cardBadge}>
                 <Text style={s.cardBadgeTxt}>{open} poste{open>1?'s':''} dispo</Text>
@@ -102,7 +103,7 @@ export default function StaffFeed() {
                   {e.organizer && <Text style={s.cardMeta}>· {e.organizer.company_name}</Text>}
                 </View>
                 <TouchableOpacity style={s.applyBtn} onPress={()=>router.push({ pathname:'/(staff)/mission/[id]', params:{id:e.id} } as any)} activeOpacity={0.82}>
-                  <LinearGradient colors={['rgba(167,139,250,0.35)','rgba(167,139,250,0.18)']} style={s.applyGrad}>
+                  <LinearGradient colors={['rgba(196,181,253,0.35)','rgba(196,181,253,0.18)']} style={s.applyGrad}>
                     <Text style={s.applyTxt}>Voir la mission</Text>
                     <Ionicons name="arrow-forward" size={14} color={T.violet}/>
                   </LinearGradient>
@@ -122,23 +123,23 @@ const s = StyleSheet.create({
   hello:         { color:'#fff', fontSize:22, fontWeight:'900', letterSpacing:-0.4 },
   sub:           { color:'rgba(255,255,255,0.45)', fontSize:13, marginTop:2 },
   profileBtn:    { padding:2 },
-  avatar:        { width:40, height:40, borderRadius:20, borderWidth:2, borderColor:'rgba(167,139,250,0.50)' },
+  avatar:        { width:40, height:40, borderRadius:20, borderWidth:2, borderColor:'rgba(196,181,253,0.50)' },
   filters:       { paddingHorizontal:20, paddingBottom:14, gap:8 },
   filterPill:    { paddingHorizontal:16, paddingVertical:8, borderRadius:20, backgroundColor:'rgba(255,255,255,0.05)', borderWidth:StyleSheet.hairlineWidth, borderColor:'rgba(255,255,255,0.08)' },
-  filterActive:  { backgroundColor:'rgba(167,139,250,0.20)', borderColor:'#A78BFA' },
+  filterActive:  { backgroundColor:'rgba(196,181,253,0.20)', borderColor:'#C4B5FD' },
   filterTxt:     { color:'rgba(255,255,255,0.50)', fontSize:13, fontWeight:'600' },
-  filterTxtActive:{ color:'#A78BFA' },
-  card:          { borderRadius:20, overflow:'hidden', backgroundColor:'#0D1A35', borderWidth:StyleSheet.hairlineWidth, borderColor:'rgba(167,139,250,0.20)', minHeight:280 },
+  filterTxtActive:{ color:'#C4B5FD' },
+  card:          { borderRadius:20, overflow:'hidden', backgroundColor:'#141821', borderWidth:StyleSheet.hairlineWidth, borderColor:'rgba(196,181,253,0.20)', minHeight:280 },
   cardImg:       { position:'absolute', top:0, left:0, right:0, height:200 },
-  cardBadge:     { position:'absolute', top:14, left:14, backgroundColor:'rgba(167,139,250,0.30)', paddingHorizontal:12, paddingVertical:5, borderRadius:20, borderWidth:1, borderColor:'rgba(167,139,250,0.50)' },
-  cardBadgeTxt:  { color:'#A78BFA', fontSize:11, fontWeight:'800' },
-  distBadge:     { position:'absolute', top:14, right:14, flexDirection:'row', alignItems:'center', gap:4, backgroundColor:'rgba(7,12,23,0.75)', paddingHorizontal:10, paddingVertical:5, borderRadius:12 },
+  cardBadge:     { position:'absolute', top:14, left:14, backgroundColor:'rgba(196,181,253,0.30)', paddingHorizontal:12, paddingVertical:5, borderRadius:20, borderWidth:1, borderColor:'rgba(196,181,253,0.50)' },
+  cardBadgeTxt:  { color:'#C4B5FD', fontSize:11, fontWeight:'800' },
+  distBadge:     { position:'absolute', top:14, right:14, flexDirection:'row', alignItems:'center', gap:4, backgroundColor:'rgba(10,12,16,0.75)', paddingHorizontal:10, paddingVertical:5, borderRadius:12 },
   distTxt:       { color:'rgba(255,255,255,0.60)', fontSize:10, fontWeight:'600' },
   cardBody:      { padding:18, paddingTop:140, gap:8 },
   cardTitle:     { color:'#fff', fontSize:18, fontWeight:'900', letterSpacing:-0.3, lineHeight:24 },
   cardRow:       { flexDirection:'row', alignItems:'center', gap:6, flexWrap:'wrap' },
   cardMeta:      { color:'rgba(255,255,255,0.55)', fontSize:12, fontWeight:'500', flex:1 },
-  applyBtn:      { borderRadius:14, overflow:'hidden', marginTop:4, borderWidth:1, borderColor:'rgba(167,139,250,0.40)' },
+  applyBtn:      { borderRadius:14, overflow:'hidden', marginTop:4, borderWidth:1, borderColor:'rgba(196,181,253,0.40)' },
   applyGrad:     { flexDirection:'row', alignItems:'center', justifyContent:'center', gap:8, paddingVertical:14 },
-  applyTxt:      { color:'#A78BFA', fontSize:14, fontWeight:'800' },
+  applyTxt:      { color:'#C4B5FD', fontSize:14, fontWeight:'800' },
 });
