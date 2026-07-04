@@ -1,5 +1,6 @@
 /**
- * app/(organizer)/events.tsx — EVENTURE v3
+ * app/(organizer)/events.tsx — EVENTURE v4
+ * Design system : Aura (dark, futuristic, professionnel)
  * Gestion multi-événements : liste, search, filter, card actions
  */
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -13,26 +14,27 @@ import { SafeAreaView }   from 'react-native-safe-area-context';
 import { useRouter }      from 'expo-router';
 import { supabase }       from '@/lib/supabase';
 import { getCurrentOrganizerId } from '@/services/api';
+import { AURA } from '@/constants/aura-theme';
+import Aura from '@/components/Aura';
 
 /* ─── Design tokens ─────────────────────────────────────────────────────── */
 const { width: SW } = Dimensions.get('window');
-const BG      = '#F8FAFC';
-const PRIMARY = '#6366F1';
-const P_LIGHT = '#EEF2FF';
-const P_GHOST = 'rgba(99,102,241,0.08)';
-const SUCCESS = '#10B981';
-const WARNING = '#F59E0B';
-const DANGER  = '#EF4444';
-const BLUE    = '#3B82F6';
+const BG      = AURA.bg;
+const PRIMARY = AURA.primary;
+const P_GHOST = AURA.primaryGhost;
+const SUCCESS = AURA.success;
+const WARNING = AURA.warning;
+const DANGER  = AURA.danger;
+const CYAN    = AURA.cyan;
 const EDGE    = 16;
 
 const C = {
-  text:      '#111827',
-  textSub:   '#6B7280',
-  textMuted: '#9CA3AF',
-  border:    '#E5E7EB',
-  surface:   '#FFFFFF',
-  surfaceAlt:'#F1F5F9',
+  text:      AURA.text,
+  textSub:   AURA.textSub,
+  textMuted: AURA.textMuted,
+  border:    AURA.border,
+  surface:   AURA.surface,
+  surfaceAlt:AURA.surfaceAlt,
 } as const;
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
@@ -56,14 +58,14 @@ const daysUntil = (iso: string) =>
   Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000);
 
 const STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
-  published: { label: 'Actif',     color: SUCCESS, bg: 'rgba(16,185,129,0.10)' },
-  draft:     { label: 'Brouillon', color: WARNING, bg: 'rgba(245,158,11,0.10)' },
+  published: { label: 'Actif',     color: SUCCESS, bg: AURA.successGhost },
+  draft:     { label: 'Brouillon', color: WARNING, bg: AURA.warningGhost },
   done:      { label: 'Terminé',   color: C.textMuted, bg: C.surfaceAlt },
-  cancelled: { label: 'Annulé',    color: DANGER,  bg: 'rgba(239,68,68,0.10)' },
+  cancelled: { label: 'Annulé',    color: DANGER,  bg: AURA.dangerGhost },
 };
 const TYPE_COLORS: Record<string, string> = {
-  Festival: SUCCESS, Gala: '#F59E0B', Conférence: BLUE,
-  Mariage: '#EC4899', Séminaire: '#8B5CF6', Concert: DANGER, Sport: SUCCESS,
+  Festival: SUCCESS, Gala: WARNING, Conférence: CYAN,
+  Mariage: '#F472B6', Séminaire: AURA.secondary, Concert: DANGER, Sport: SUCCESS,
 };
 
 /* ─── Event Card ─────────────────────────────────────────────────────────── */
@@ -99,83 +101,80 @@ const EvtCard = memo(function EvtCard({
       ],
       marginBottom: 12,
     }}>
-      <TouchableOpacity
-        style={cd.card}
-        onPress={onPress} onPressIn={onPI} onPressOut={onPO}
-        activeOpacity={1}
-      >
-        {/* Color bar + gradient */}
-        <LinearGradient colors={[`${tc}10`, `${tc}02`]} style={[StyleSheet.absoluteFill, { borderRadius: 14 }]}/>
-        <View style={[cd.colorBar, { backgroundColor: tc }]}/>
+      <Aura color={`${tc}55`} radius={14} onPress={onPress} onPressIn={onPI} onPressOut={onPO}>
+        <View style={cd.card}>
+          {/* Color bar + gradient */}
+          <LinearGradient colors={[`${tc}18`, `${tc}03`]} style={[StyleSheet.absoluteFill, { borderRadius: 14 }]}/>
+          <View style={[cd.colorBar, { backgroundColor: tc }]}/>
 
-        {/* Header */}
-        <View style={cd.row}>
-          <View style={[cd.typeIconWrap, { backgroundColor: `${tc}15` }]}>
-            <Ionicons name="calendar-outline" size={16} color={tc}/>
+          {/* Header */}
+          <View style={cd.row}>
+            <View style={[cd.typeIconWrap, { backgroundColor: `${tc}22` }]}>
+              <Ionicons name="calendar-outline" size={16} color={tc}/>
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={cd.title} numberOfLines={1}>{evt.title}</Text>
+              {evt.type && <Text style={[cd.type, { color: tc }]}>{evt.type}</Text>}
+            </View>
+            <View style={[cd.badge, { backgroundColor: cfg.bg }]}>
+              <Text style={[cd.badgeTxt, { color: cfg.color }]}>{cfg.label}</Text>
+            </View>
           </View>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text style={cd.title} numberOfLines={1}>{evt.title}</Text>
-            {evt.type && <Text style={[cd.type, { color: tc }]}>{evt.type}</Text>}
-          </View>
-          <View style={[cd.badge, { backgroundColor: cfg.bg }]}>
-            <Text style={[cd.badgeTxt, { color: cfg.color }]}>{cfg.label}</Text>
-          </View>
-        </View>
 
-        {/* Meta info */}
-        <View style={{ gap: 6 }}>
-          <View style={cd.metaRow}>
-            <Ionicons name="time-outline" size={13} color={C.textMuted}/>
-            <Text style={cd.meta}>
-              {fmtDate(evt.date_start)}
-              {evt.date_end ? ` → ${fmtDate(evt.date_end)}` : ''}
-            </Text>
-            {!isPast && (
-              <View style={[cd.daysBadge, { backgroundColor: days <= 3 ? 'rgba(239,68,68,0.08)' : days <= 7 ? 'rgba(245,158,11,0.08)' : P_GHOST }]}>
-                <Text style={[cd.daysTxt, { color: days <= 3 ? DANGER : days <= 7 ? WARNING : PRIMARY }]}>
-                  {days === 0 ? "Auj." : `J-${days}`}
-                </Text>
+          {/* Meta info */}
+          <View style={{ gap: 6 }}>
+            <View style={cd.metaRow}>
+              <Ionicons name="time-outline" size={13} color={C.textMuted}/>
+              <Text style={cd.meta}>
+                {fmtDate(evt.date_start)}
+                {evt.date_end ? ` → ${fmtDate(evt.date_end)}` : ''}
+              </Text>
+              {!isPast && (
+                <View style={[cd.daysBadge, { backgroundColor: days <= 3 ? AURA.dangerGhost : days <= 7 ? AURA.warningGhost : P_GHOST }]}>
+                  <Text style={[cd.daysTxt, { color: days <= 3 ? DANGER : days <= 7 ? WARNING : PRIMARY }]}>
+                    {days === 0 ? "Auj." : `J-${days}`}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View style={cd.metaRow}>
+              <Ionicons name="location-outline" size={13} color={C.textMuted}/>
+              <Text style={cd.meta} numberOfLines={1}>{evt.location}</Text>
+            </View>
+            {evt.budget != null && evt.budget > 0 && (
+              <View style={cd.metaRow}>
+                <Ionicons name="cash-outline" size={13} color={C.textMuted}/>
+                <Text style={cd.meta}>{evt.budget.toLocaleString('fr-FR')} €</Text>
               </View>
             )}
           </View>
-          <View style={cd.metaRow}>
-            <Ionicons name="location-outline" size={13} color={C.textMuted}/>
-            <Text style={cd.meta} numberOfLines={1}>{evt.location}</Text>
+
+          {/* Divider */}
+          <View style={cd.divider}/>
+
+          {/* Actions */}
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity style={[cd.action, cd.actionPrimary]} onPress={onPress} activeOpacity={0.8}>
+              <Ionicons name="eye-outline" size={14} color={PRIMARY}/>
+              <Text style={[cd.actionTxt, { color: PRIMARY }]}>Détails</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[cd.action, cd.actionSecondary]} onPress={onMissions} activeOpacity={0.8}>
+              <Ionicons name="clipboard-outline" size={14} color={C.textSub}/>
+              <Text style={[cd.actionTxt, { color: C.textSub }]}>Missions</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[cd.action, cd.actionSecondary]} onPress={onStaff} activeOpacity={0.8}>
+              <Ionicons name="people-outline" size={14} color={C.textSub}/>
+              <Text style={[cd.actionTxt, { color: C.textSub }]}>Staff</Text>
+            </TouchableOpacity>
           </View>
-          {evt.budget != null && evt.budget > 0 && (
-            <View style={cd.metaRow}>
-              <Ionicons name="cash-outline" size={13} color={C.textMuted}/>
-              <Text style={cd.meta}>{evt.budget.toLocaleString('fr-FR')} €</Text>
-            </View>
-          )}
         </View>
-
-        {/* Divider */}
-        <View style={cd.divider}/>
-
-        {/* Actions */}
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <TouchableOpacity style={[cd.action, cd.actionPrimary]} onPress={onPress} activeOpacity={0.8}>
-            <Ionicons name="eye-outline" size={14} color={PRIMARY}/>
-            <Text style={[cd.actionTxt, { color: PRIMARY }]}>Détails</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[cd.action, cd.actionSecondary]} onPress={onMissions} activeOpacity={0.8}>
-            <Ionicons name="clipboard-outline" size={14} color={C.textSub}/>
-            <Text style={[cd.actionTxt, { color: C.textSub }]}>Missions</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[cd.action, cd.actionSecondary]} onPress={onStaff} activeOpacity={0.8}>
-            <Ionicons name="people-outline" size={14} color={C.textSub}/>
-            <Text style={[cd.actionTxt, { color: C.textSub }]}>Staff</Text>
-          </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
+      </Aura>
     </Animated.View>
   );
 });
 const cd = StyleSheet.create({
   card:        { backgroundColor: C.surface, borderRadius: 14, padding: 16, paddingLeft: 20, gap: 12,
-                 borderWidth: 1, borderColor: C.border, overflow: 'hidden',
-                 shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
+                 borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
   colorBar:    { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, borderTopLeftRadius: 14, borderBottomLeftRadius: 14 },
   row:         { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   typeIconWrap:{ width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
@@ -204,11 +203,11 @@ const Skeleton = memo(() => {
     ]));
     loop.start(); return () => loop.stop();
   }, []);
-  const op = a.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
+  const op = a.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.7] });
   return (
     <View style={{ gap: 12 }}>
       {[0, 1, 2].map(i => (
-        <Animated.View key={i} style={{ height: 180, borderRadius: 14, backgroundColor: '#E5E7EB', opacity: op }}/>
+        <Animated.View key={i} style={{ height: 180, borderRadius: 14, backgroundColor: C.surfaceAlt, opacity: op }}/>
       ))}
     </View>
   );
@@ -285,15 +284,12 @@ export default function EventsScreen() {
               <Text style={{ fontSize: 22, fontWeight: '800', color: C.text }}>Événements</Text>
               <Text style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>{counts.all} événements</Text>
             </View>
-            <TouchableOpacity
-              style={{ backgroundColor: PRIMARY, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12,
-                       shadowColor: PRIMARY, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 }}
-              onPress={() => router.push('/(organizer)/create-event' as any)}
-              activeOpacity={0.82}
-            >
-              <Ionicons name="add" size={16} color="#FFF"/>
-              <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Créer</Text>
-            </TouchableOpacity>
+            <Aura color={AURA.primaryGlow} radius={12} onPress={() => router.push('/(organizer)/create-event' as any)}>
+              <View style={{ backgroundColor: PRIMARY, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 }}>
+                <Ionicons name="add" size={16} color="#FFF"/>
+                <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Créer</Text>
+              </View>
+            </Aura>
           </View>
 
           {/* Search */}
@@ -344,7 +340,7 @@ export default function EventsScreen() {
           {loading ? <Skeleton/> : (
             filtered.length === 0 ? (
               <View style={{ alignItems: 'center', paddingTop: 80, gap: 16 }}>
-                <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: P_LIGHT, alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: P_GHOST, alignItems: 'center', justifyContent: 'center' }}>
                   <Ionicons name="calendar-outline" size={32} color={PRIMARY}/>
                 </View>
                 <Text style={{ fontSize: 17, fontWeight: '700', color: C.text }}>
@@ -354,14 +350,11 @@ export default function EventsScreen() {
                   {search ? `Aucun résultat pour "${search}"` : 'Créez votre premier événement pour démarrer.'}
                 </Text>
                 {!search && (
-                  <TouchableOpacity
-                    style={{ backgroundColor: PRIMARY, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10,
-                             shadowColor: PRIMARY, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 }}
-                    onPress={() => router.push('/(organizer)/create-event' as any)}
-                    activeOpacity={0.82}
-                  >
-                    <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 14 }}>+ Créer un événement</Text>
-                  </TouchableOpacity>
+                  <Aura color={AURA.primaryGlow} radius={10} onPress={() => router.push('/(organizer)/create-event' as any)}>
+                    <View style={{ backgroundColor: PRIMARY, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 }}>
+                      <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 14 }}>+ Créer un événement</Text>
+                    </View>
+                  </Aura>
                 )}
               </View>
             ) : (
@@ -390,10 +383,10 @@ const hs = StyleSheet.create({
   searchInput:  { flex: 1, fontSize: 14, color: C.text, padding: 0 },
   chip:         { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7,
                   borderRadius: 20, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border },
-  chipActive:   { backgroundColor: P_LIGHT, borderColor: PRIMARY },
+  chipActive:   { backgroundColor: P_GHOST, borderColor: PRIMARY },
   chipTxt:      { fontSize: 13, fontWeight: '600', color: C.textSub },
   chipTxtActive:{ color: PRIMARY, fontWeight: '700' },
   chipBadge:    { backgroundColor: C.surfaceAlt, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1 },
-  chipBadgeActive:{ backgroundColor: P_LIGHT },
+  chipBadgeActive:{ backgroundColor: P_GHOST },
   chipBadgeTxt: { fontSize: 10, fontWeight: '700', color: C.textMuted },
 });

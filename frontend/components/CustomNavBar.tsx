@@ -12,6 +12,7 @@ import { BlurView }  from 'expo-blur';
 import { Ionicons }  from '@expo/vector-icons';
 import { supabase }  from '@/lib/supabase';
 import { getCurrentOrganizerId } from '@/services/api';
+import { AURA } from '@/constants/aura-theme';
 
 let _useRouter: (() => { push: (p: any) => void }) | null = null;
 let _usePathname: (() => string) | null = null;
@@ -21,8 +22,8 @@ try {
   _usePathname = er.usePathname;
 } catch {}
 
-const PRIMARY  = '#6366F1';
-const INACTIVE = '#9CA3AF';
+const PRIMARY  = AURA.primary;
+const INACTIVE = AURA.textMuted;
 
 interface TabDef {
   key: string;
@@ -178,7 +179,7 @@ function CustomNavBarInner() {
 
   return (
     <View style={ns.bar}>
-      <BlurView intensity={Platform.OS === 'ios' ? 60 : 25} tint="light" style={ns.blur}>
+      <BlurView intensity={Platform.OS === 'ios' ? 60 : 25} tint="dark" style={ns.blur}>
         {TABS.map(tab => (
           <TabItem
             key={tab.key}
@@ -216,7 +217,7 @@ const ns = StyleSheet.create({
     height:        Platform.OS === 'ios' ? 82 : 66,
     overflow:     'hidden',
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: AURA.border,
   },
   blur: {
     flex:             1,
@@ -225,7 +226,7 @@ const ns = StyleSheet.create({
     alignItems:      'flex-start',
     paddingTop:       8,
     paddingHorizontal: 4,
-    backgroundColor: 'rgba(255,255,255,0.92)',
+    backgroundColor: 'rgba(10,12,16,0.88)',
   },
   tab: {
     flex:    1,
@@ -258,7 +259,7 @@ const ns = StyleSheet.create({
     alignItems:    'center',
     justifyContent:'center',
     borderRadius:  10,
-    backgroundColor: 'rgba(99,102,241,0.10)',
+    backgroundColor: AURA.primaryGhost,
     position:      'relative',
   },
   label: {
@@ -278,12 +279,12 @@ const ns = StyleSheet.create({
     minWidth:         15,
     height:           15,
     borderRadius:     8,
-    backgroundColor: '#EF4444',
+    backgroundColor: AURA.danger,
     alignItems:      'center',
     justifyContent:  'center',
     paddingHorizontal: 3,
     borderWidth:      1.5,
-    borderColor:      '#FFFFFF',
+    borderColor:      AURA.bg,
   },
   badgeTxt: {
     color:      '#FFFFFF',

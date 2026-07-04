@@ -29,28 +29,29 @@ import React, {
   import { useRouter }      from 'expo-router';
   import { supabase }       from '@/lib/supabase';
   import { getCurrentOrganizerId } from '@/services/api';
+  import { AURA }           from '@/constants/aura-theme';
   
-  /* ─── Palette ADN dashboard ────────────────────────────────────────────── */
+  /* ─── Palette Aura — dark, futuristic, professionnel ───────────────────── */
   const { width: SW } = Dimensions.get('window');
-  const BG    = '#020A06';
-  const GREEN = '#00D97E';
-  const GOLD  = '#F5C842';
+  const BG    = AURA.bg;
+  const GREEN = AURA.primary;
+  const GOLD  = AURA.warning;
   const EDGE  = 20;
   
   const T = {
-    white   : '#FFFFFF',
-    muted   : 'rgba(255,255,255,0.50)',
-    faint   : 'rgba(255,255,255,0.14)',
-    surf    : 'rgba(255,255,255,0.045)',
-    border  : 'rgba(0,217,126,0.12)',
-    borderHi: 'rgba(0,217,126,0.30)',
-    greenDim: 'rgba(0,217,126,0.12)',
-    goldDim : 'rgba(245,200,66,0.12)',
-    navy    : '#0A2218',
-    amber   : '#F59E0B',
-    red     : '#EF4444',
-    blue    : '#60A5FA',
-    purple  : '#A78BFA',
+    white   : AURA.text,
+    muted   : AURA.textSub,
+    faint   : AURA.textMuted,
+    surf    : AURA.surfaceAlt,
+    border  : AURA.border,
+    borderHi: AURA.primaryBorder,
+    greenDim: AURA.primaryGhost,
+    goldDim : AURA.warningGhost,
+    navy    : AURA.surface,
+    amber   : AURA.warning,
+    red     : AURA.danger,
+    blue    : AURA.cyan,
+    purple  : AURA.secondary,
   } as const;
   
   /* ─── Types ────────────────────────────────────────────────────────────── */
@@ -98,16 +99,16 @@ import React, {
   
   /* ─── Particle Background (identique dashboard) ────────────────────────── */
   const rnd = (a: number, b: number) => a + Math.random() * (b - a);
-  const PCOLS = ['#00D97E','rgba(0,217,126,0.4)','#F5C842','rgba(245,200,66,0.32)','rgba(255,255,255,0.16)'];
+  const PCOLS = [AURA.primary,'rgba(129,140,248,0.4)',AURA.warning,'rgba(251,191,36,0.32)','rgba(255,255,255,0.16)'];
   const PTS   = Array.from({length:20},(_,i)=>({
     id:i, x:rnd(0,SW), y:rnd(0,880),
     sz:rnd(0.8,2.6), col:PCOLS[i%PCOLS.length], op:0.04+(i%6)*0.03,
   }));
   const ParticleBg = memo(() => (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <LinearGradient colors={[BG,'#041208',BG]} style={StyleSheet.absoluteFill}/>
-      <View style={{position:'absolute',top:'7%',left:'10%',width:SW*.72,height:SW*.72,borderRadius:SW*.36,backgroundColor:'rgba(0,217,126,0.025)'}}/>
-      <View style={{position:'absolute',bottom:'8%',right:'-18%',width:SW*.6,height:SW*.6,borderRadius:SW*.3,backgroundColor:'rgba(245,200,66,0.02)'}}/>
+      <LinearGradient colors={[BG,AURA.bgElevated,BG]} style={StyleSheet.absoluteFill}/>
+      <View style={{position:'absolute',top:'7%',left:'10%',width:SW*.72,height:SW*.72,borderRadius:SW*.36,backgroundColor:'rgba(129,140,248,0.05)'}}/>
+      <View style={{position:'absolute',bottom:'8%',right:'-18%',width:SW*.6,height:SW*.6,borderRadius:SW*.3,backgroundColor:'rgba(251,191,36,0.04)'}}/>
       {PTS.map(p=><View key={p.id} style={{position:'absolute',left:p.x,top:p.y,width:p.sz,height:p.sz,borderRadius:p.sz/2,backgroundColor:p.col,opacity:p.op}}/>)}
     </View>
   ));
@@ -201,7 +202,7 @@ import React, {
         {/* Delete background */}
         <View style={{
           position:'absolute',top:0,bottom:0,right:0,width:delWidth,
-          backgroundColor:'rgba(239,68,68,0.18)',borderRadius:16,
+          backgroundColor:AURA.dangerGhost,borderRadius:16,
           alignItems:'center',justifyContent:'center',
         }}>
           <TouchableOpacity onPress={onDelete} hitSlop={8} activeOpacity={0.75}>
@@ -300,7 +301,7 @@ import React, {
   const ni = StyleSheet.create({
     row      :{ flexDirection:'row', alignItems:'flex-start', gap:12, padding:14,
       borderRadius:16, backgroundColor:T.navy, overflow:'hidden' },
-    rowUnread:{ backgroundColor:'#0C2115' },
+    rowUnread:{ backgroundColor:AURA.bgElevated },
     accent   :{ position:'absolute', left:0, top:0, bottom:0, width:3, borderRadius:1.5 },
     iconWrap :{ width:42, height:42, borderRadius:13, alignItems:'center', justifyContent:'center',
       borderWidth:StyleSheet.hairlineWidth, position:'relative' },
@@ -655,7 +656,7 @@ import React, {
                 <View style={{alignItems:'center',paddingTop:80,gap:14}}>
                   <View style={{width:84,height:84,borderRadius:42,backgroundColor:T.greenDim,
                     alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:T.border}}>
-                    <Ionicons name="notifications-outline" size={38} color="rgba(0,217,126,0.4)"/>
+                    <Ionicons name="notifications-outline" size={38} color="rgba(129,140,248,0.45)"/>
                   </View>
                   <Text style={{color:T.white,fontSize:17,fontWeight:'900',letterSpacing:-0.3}}>
                     Aucune notification

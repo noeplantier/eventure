@@ -12,27 +12,30 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter }    from 'expo-router';
 import { supabase }     from '@/lib/supabase';
 import { getCurrentOrganizerId } from '@/services/api';
+import CenteredModal    from '@/components/CenteredModal';
+import { AURA }          from '@/constants/aura-theme';
+import Aura              from '@/components/Aura';
 
 /* ─── Design tokens ─────────────────────────────────────────────────────── */
 const { width: SW } = Dimensions.get('window');
-const BG      = '#F8FAFC';
-const PRIMARY = '#6366F1';
-const P_LIGHT = '#EEF2FF';
-const P_GHOST = 'rgba(99,102,241,0.08)';
-const SUCCESS = '#10B981';
-const WARNING = '#F59E0B';
-const DANGER  = '#EF4444';
-const PURPLE  = '#8B5CF6';
-const BLUE    = '#3B82F6';
+const BG      = AURA.bg;
+const PRIMARY = AURA.primary;
+const P_LIGHT = AURA.primaryGhost;
+const P_GHOST = AURA.primaryGhost;
+const SUCCESS = AURA.success;
+const WARNING = AURA.warning;
+const DANGER  = AURA.danger;
+const PURPLE  = AURA.secondary;
+const BLUE    = AURA.cyan;
 const EDGE    = 16;
 
 const C = {
-  text:      '#111827',
-  textSub:   '#6B7280',
-  textMuted: '#9CA3AF',
-  border:    '#E5E7EB',
-  surface:   '#FFFFFF',
-  surfaceAlt:'#F1F5F9',
+  text:      AURA.text,
+  textSub:   AURA.textSub,
+  textMuted: AURA.textMuted,
+  border:    AURA.border,
+  surface:   AURA.surface,
+  surfaceAlt:AURA.surfaceAlt,
 } as const;
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
@@ -100,98 +103,69 @@ const DayCell = memo(function DayCell({
   );
 });
 
-/* ─── Day Modal ──────────────────────────────────────────────────────────── */
+/* ─── Day Modal (centrée) ──────────────────────────────────────────────── */
 const DayModal = memo(function DayModal({
   visible, date, events, onClose, onCreateEvent,
 }: {
   visible: boolean; date: Date; events: CalEvent[]; onClose: () => void; onCreateEvent: () => void;
 }) {
-  const slideAnim = useRef(new Animated.Value(300)).current;
-  const bgAnim    = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 100, friction: 12 }),
-        Animated.timing(bgAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(slideAnim, { toValue: 300, duration: 200, useNativeDriver: true }),
-        Animated.timing(bgAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [visible]);
-
   const dayLabel = date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      <Animated.View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end', opacity: bgAnim }}>
-        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} activeOpacity={1}/>
-        <Animated.View style={[dm.sheet, { transform: [{ translateY: slideAnim }] }]}>
+    <CenteredModal visible={visible} onClose={onClose}>
+      {/* Header */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <Text style={dm.dateTitle}>{dayLabel}</Text>
+        <TouchableOpacity onPress={onClose} style={dm.closeBtn} activeOpacity={0.7}>
+          <Ionicons name="close" size={20} color={C.textMuted}/>
+        </TouchableOpacity>
+      </View>
 
-          {/* Handle */}
-          <View style={dm.handle}/>
-
-          {/* Header */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <Text style={dm.dateTitle}>{dayLabel}</Text>
-            <TouchableOpacity onPress={onClose} style={dm.closeBtn} activeOpacity={0.7}>
-              <Ionicons name="close" size={20} color={C.textMuted}/>
-            </TouchableOpacity>
+      {events.length > 0 ? (
+        <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 320 }}>
+          <Text style={dm.sectionLabel}>{events.length} événement{events.length > 1 ? 's' : ''}</Text>
+          <View style={{ gap: 8 }}>
+            {events.map(ev => {
+              const tc = typeColor(ev.type);
+              return (
+                <View key={ev.id} style={[dm.evtRow, { borderLeftColor: tc }]}>
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <Text style={dm.evtTitle} numberOfLines={1}>{ev.title}</Text>
+                    <Text style={dm.evtMeta} numberOfLines={1}>{ev.location}</Text>
+                    {ev.type && <Text style={[dm.evtType, { color: tc }]}>{ev.type}</Text>}
+                  </View>
+                  <View style={{ paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6,
+                                 backgroundColor: ev.status === 'published' ? AURA.successGhost : C.surfaceAlt }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700',
+                                   color: ev.status === 'published' ? SUCCESS : C.textMuted }}>
+                      {ev.status === 'published' ? 'Actif' : ev.status === 'draft' ? 'Brouillon' : 'Terminé'}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
           </View>
+        </ScrollView>
+      ) : (
+        <View style={{ alignItems: 'center', paddingVertical: 32, gap: 12 }}>
+          <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: P_LIGHT, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="calendar-outline" size={26} color={PRIMARY}/>
+          </View>
+          <Text style={{ fontSize: 15, fontWeight: '600', color: C.text }}>Aucun événement</Text>
+          <Text style={{ color: C.textSub, fontSize: 12, textAlign: 'center' }}>Ce jour est libre.</Text>
+        </View>
+      )}
 
-          {events.length > 0 ? (
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 320 }}>
-              <Text style={dm.sectionLabel}>{events.length} événement{events.length > 1 ? 's' : ''}</Text>
-              <View style={{ gap: 8 }}>
-                {events.map(ev => {
-                  const tc = typeColor(ev.type);
-                  return (
-                    <View key={ev.id} style={[dm.evtRow, { borderLeftColor: tc }]}>
-                      <View style={{ flex: 1, gap: 3 }}>
-                        <Text style={dm.evtTitle} numberOfLines={1}>{ev.title}</Text>
-                        <Text style={dm.evtMeta} numberOfLines={1}>{ev.location}</Text>
-                        {ev.type && <Text style={[dm.evtType, { color: tc }]}>{ev.type}</Text>}
-                      </View>
-                      <View style={{ paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6,
-                                     backgroundColor: ev.status === 'published' ? 'rgba(16,185,129,0.10)' : C.surfaceAlt }}>
-                        <Text style={{ fontSize: 10, fontWeight: '700',
-                                       color: ev.status === 'published' ? SUCCESS : C.textMuted }}>
-                          {ev.status === 'published' ? 'Actif' : ev.status === 'draft' ? 'Brouillon' : 'Terminé'}
-                        </Text>
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-            </ScrollView>
-          ) : (
-            <View style={{ alignItems: 'center', paddingVertical: 32, gap: 12 }}>
-              <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: P_LIGHT, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="calendar-outline" size={26} color={PRIMARY}/>
-              </View>
-              <Text style={{ fontSize: 15, fontWeight: '600', color: C.text }}>Aucun événement</Text>
-              <Text style={{ color: C.textSub, fontSize: 12, textAlign: 'center' }}>Ce jour est libre.</Text>
-            </View>
-          )}
-
-          <TouchableOpacity style={dm.createBtn} onPress={onCreateEvent} activeOpacity={0.85}>
-            <Ionicons name="add" size={18} color="#FFF"/>
-            <Text style={dm.createTxt}>Créer un événement ce jour</Text>
-          </TouchableOpacity>
-
-        </Animated.View>
-      </Animated.View>
-    </Modal>
+      <Aura color={AURA.primaryGlow} radius={12} onPress={onCreateEvent}>
+        <View style={dm.createBtn}>
+          <Ionicons name="add" size={18} color="#FFF"/>
+          <Text style={dm.createTxt}>Créer un événement ce jour</Text>
+        </View>
+      </Aura>
+    </CenteredModal>
   );
 });
 const dm = StyleSheet.create({
-  sheet:       { backgroundColor: C.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24,
-                 padding: 20, paddingTop: 12,
-                 shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 20 },
-  handle:      { width: 40, height: 4, borderRadius: 2, backgroundColor: C.border, alignSelf: 'center', marginBottom: 16 },
   dateTitle:   { fontSize: 17, fontWeight: '800', color: C.text, textTransform: 'capitalize' },
   closeBtn:    { width: 32, height: 32, borderRadius: 16, backgroundColor: C.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
   sectionLabel:{ fontSize: 12, fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
@@ -201,8 +175,7 @@ const dm = StyleSheet.create({
   evtMeta:     { fontSize: 12, color: C.textSub },
   evtType:     { fontSize: 11, fontWeight: '600' },
   createBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-                 backgroundColor: PRIMARY, borderRadius: 12, paddingVertical: 14, marginTop: 16,
-                 shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6 },
+                 backgroundColor: PRIMARY, borderRadius: 12, paddingVertical: 14, marginTop: 16 },
   createTxt:   { color: '#FFF', fontWeight: '800', fontSize: 15 },
 });
 
@@ -312,15 +285,12 @@ export default function CalendarScreen() {
         <View style={{ paddingHorizontal: EDGE, paddingTop: 12, paddingBottom: 8, gap: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Text style={{ fontSize: 22, fontWeight: '800', color: C.text }}>Calendrier</Text>
-            <TouchableOpacity
-              style={{ backgroundColor: PRIMARY, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12,
-                       shadowColor: PRIMARY, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 }}
-              onPress={() => router.push('/(organizer)/create-event' as any)}
-              activeOpacity={0.82}
-            >
-              <Ionicons name="add" size={16} color="#FFF"/>
-              <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Créer</Text>
-            </TouchableOpacity>
+            <Aura color={AURA.primaryGlow} radius={12} onPress={() => router.push('/(organizer)/create-event' as any)}>
+              <View style={{ backgroundColor: PRIMARY, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 }}>
+                <Ionicons name="add" size={16} color="#FFF"/>
+                <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Créer</Text>
+              </View>
+            </Aura>
           </View>
 
           {/* Month navigation */}
@@ -401,33 +371,31 @@ export default function CalendarScreen() {
                 const days = Math.ceil((new Date(ev.date_start).getTime() - Date.now()) / 86400000);
                 const isPast = days < 0;
                 return (
-                  <TouchableOpacity
-                    key={ev.id}
-                    style={[cal.evtCard, { borderLeftColor: tc }]}
-                    onPress={() => router.push({ pathname: '/(organizer)/event/[id]', params: { id: ev.id } } as any)}
-                    activeOpacity={0.82}
-                  >
-                    <View style={{ flex: 1, gap: 3 }}>
-                      <Text style={cal.evtTitle} numberOfLines={1}>{ev.title}</Text>
-                      <Text style={cal.evtDate}>
-                        {new Date(ev.date_start).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                        {ev.date_end ? ` → ${new Date(ev.date_end).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''}
-                      </Text>
-                      <Text style={cal.evtLoc} numberOfLines={1}>{ev.location}</Text>
+                  <Aura key={ev.id} color={`${tc}55`} radius={12}
+                    onPress={() => router.push({ pathname: '/(organizer)/event/[id]', params: { id: ev.id } } as any)}>
+                    <View style={[cal.evtCard, { borderLeftColor: tc }]}>
+                      <View style={{ flex: 1, gap: 3 }}>
+                        <Text style={cal.evtTitle} numberOfLines={1}>{ev.title}</Text>
+                        <Text style={cal.evtDate}>
+                          {new Date(ev.date_start).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                          {ev.date_end ? ` → ${new Date(ev.date_end).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''}
+                        </Text>
+                        <Text style={cal.evtLoc} numberOfLines={1}>{ev.location}</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                        {!isPast && (
+                          <View style={{ paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6,
+                                         backgroundColor: days <= 3 ? AURA.dangerGhost : days <= 7 ? AURA.warningGhost : P_GHOST }}>
+                            <Text style={{ fontSize: 10, fontWeight: '700',
+                                           color: days <= 3 ? DANGER : days <= 7 ? WARNING : PRIMARY }}>
+                              {days === 0 ? "Auj." : `J-${days}`}
+                            </Text>
+                          </View>
+                        )}
+                        <Ionicons name="chevron-forward" size={14} color={C.textMuted}/>
+                      </View>
                     </View>
-                    <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                      {!isPast && (
-                        <View style={{ paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6,
-                                       backgroundColor: days <= 3 ? 'rgba(239,68,68,0.08)' : days <= 7 ? 'rgba(245,158,11,0.08)' : P_GHOST }}>
-                          <Text style={{ fontSize: 10, fontWeight: '700',
-                                         color: days <= 3 ? DANGER : days <= 7 ? WARNING : PRIMARY }}>
-                            {days === 0 ? "Auj." : `J-${days}`}
-                          </Text>
-                        </View>
-                      )}
-                      <Ionicons name="chevron-forward" size={14} color={C.textMuted}/>
-                    </View>
-                  </TouchableOpacity>
+                  </Aura>
                 );
               })}
             </View>
@@ -461,11 +429,9 @@ export default function CalendarScreen() {
 }
 
 const cal = StyleSheet.create({
-  grid:     { backgroundColor: C.surface, borderRadius: 16, padding: 12, borderWidth: 1, borderColor: C.border,
-              shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 3 },
+  grid:     { backgroundColor: C.surface, borderRadius: 16, padding: 12, borderWidth: 1, borderColor: C.border },
   evtCard:  { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderRadius: 12,
-              padding: 14, borderLeftWidth: 3, borderWidth: 1, borderColor: C.border,
-              shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 },
+              padding: 14, borderLeftWidth: 3, borderWidth: 1, borderColor: C.border },
   evtTitle: { fontSize: 14, fontWeight: '700', color: C.text },
   evtDate:  { fontSize: 12, color: C.textSub },
   evtLoc:   { fontSize: 11, color: C.textMuted },

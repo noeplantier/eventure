@@ -14,26 +14,28 @@ import { SafeAreaView }   from 'react-native-safe-area-context';
 import { useRouter }      from 'expo-router';
 import { supabase }       from '@/lib/supabase';
 import { getCurrentOrganizerId } from '@/services/api';
+import { AURA }           from '@/constants/aura-theme';
+import Aura               from '@/components/Aura';
 
 /* ─── Design tokens ─────────────────────────────────────────────────────── */
-const BG      = '#F8FAFC';
-const PRIMARY = '#6366F1';
-const P_LIGHT = '#EEF2FF';
-const P_GHOST = 'rgba(99,102,241,0.08)';
-const SUCCESS = '#10B981';
-const WARNING = '#F59E0B';
-const DANGER  = '#EF4444';
-const GOLD    = '#F59E0B';
-const BLUE    = '#3B82F6';
+const BG      = AURA.bg;
+const PRIMARY = AURA.primary;
+const P_LIGHT = AURA.primaryGhost;
+const P_GHOST = AURA.primaryGhost;
+const SUCCESS = AURA.success;
+const WARNING = AURA.warning;
+const DANGER  = AURA.danger;
+const GOLD    = AURA.warning;
+const BLUE    = AURA.cyan;
 const EDGE    = 16;
 
 const C = {
-  text:      '#111827',
-  textSub:   '#6B7280',
-  textMuted: '#9CA3AF',
-  border:    '#E5E7EB',
-  surface:   '#FFFFFF',
-  surfaceAlt:'#F1F5F9',
+  text:      AURA.text,
+  textSub:   AURA.textSub,
+  textMuted: AURA.textMuted,
+  border:    AURA.border,
+  surface:   AURA.surface,
+  surfaceAlt:AURA.surfaceAlt,
 } as const;
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
@@ -63,10 +65,10 @@ interface Mission {
 
 /* ─── Pay config ─────────────────────────────────────────────────────────── */
 const PAY: Record<PayStatus, { label: string; color: string; bg: string; icon: React.ComponentProps<typeof Ionicons>['name'] }> = {
-  pending  : { label: 'En attente', color: WARNING, bg: 'rgba(245,158,11,0.10)',  icon: 'time-outline' },
-  paid     : { label: 'Payé',       color: SUCCESS, bg: 'rgba(16,185,129,0.10)',  icon: 'checkmark-circle-outline' },
-  partial  : { label: 'Partiel',    color: BLUE,    bg: 'rgba(59,130,246,0.10)',  icon: 'ellipsis-horizontal-circle-outline' },
-  cancelled: { label: 'Annulé',     color: DANGER,  bg: 'rgba(239,68,68,0.10)',   icon: 'close-circle-outline' },
+  pending  : { label: 'En attente', color: WARNING, bg: AURA.warningGhost,  icon: 'time-outline' },
+  paid     : { label: 'Payé',       color: SUCCESS, bg: AURA.successGhost,  icon: 'checkmark-circle-outline' },
+  partial  : { label: 'Partiel',    color: BLUE,    bg: AURA.cyanGhost,  icon: 'ellipsis-horizontal-circle-outline' },
+  cancelled: { label: 'Annulé',     color: DANGER,  bg: AURA.dangerGhost,   icon: 'close-circle-outline' },
 };
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
@@ -104,8 +106,7 @@ const KPICard = memo(({ icon, value, label, color, bg, suffix = '' }: {
 });
 const kc = StyleSheet.create({
   card:    { flex: 1, backgroundColor: C.surface, borderRadius: 12, padding: 12, gap: 5, alignItems: 'flex-start',
-             borderWidth: 1, borderColor: C.border,
-             shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 3 },
+             borderWidth: 1, borderColor: C.border },
   iconWrap:{ width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   value:   { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
   label:   { fontSize: 10, color: C.textMuted, fontWeight: '500', lineHeight: 14 },
@@ -136,19 +137,17 @@ const MissionCard = memo(function MissionCard({
     ? `${((new Date(m.check_out).getTime() - new Date(m.check_in).getTime()) / 3600000).toFixed(1)}h`
     : null;
 
+  const onPI = () => Animated.spring(press, { toValue: 0.97, useNativeDriver: true, tension: 300, friction: 10 }).start();
+  const onPO = () => Animated.spring(press, { toValue: 1,   useNativeDriver: true, tension: 300, friction: 10 }).start();
+
   return (
     <Animated.View style={{
       opacity: enter,
       transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }, { scale: press }],
       marginBottom: 10,
     }}>
-      <TouchableOpacity
-        style={[mc.card, { borderLeftColor: pay.color }]}
-        onPress={onPress}
-        onPressIn={() => Animated.spring(press, { toValue: 0.97, useNativeDriver: true, tension: 300, friction: 10 }).start()}
-        onPressOut={() => Animated.spring(press, { toValue: 1,   useNativeDriver: true, tension: 300, friction: 10 }).start()}
-        activeOpacity={1}
-      >
+      <Aura color={`${pay.color}55`} radius={12} onPress={onPress} onPressIn={onPI} onPressOut={onPO}>
+        <View style={[mc.card, { borderLeftColor: pay.color }]}>
         {/* Event row */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <View style={[mc.evtIcon, { backgroundColor: `${tc}15` }]}>
@@ -216,14 +215,14 @@ const MissionCard = memo(function MissionCard({
             </View>
           </View>
         )}
-      </TouchableOpacity>
+        </View>
+      </Aura>
     </Animated.View>
   );
 });
 const mc = StyleSheet.create({
   card:    { backgroundColor: C.surface, borderRadius: 12, padding: 14, paddingLeft: 16, gap: 10,
-             borderWidth: 1, borderColor: C.border, borderLeftWidth: 3, overflow: 'hidden',
-             shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
+             borderWidth: 1, borderColor: C.border, borderLeftWidth: 3, overflow: 'hidden' },
   evtIcon: { width: 26, height: 26, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   evtTitle:{ fontSize: 12, fontWeight: '700', color: C.textSub, flex: 1 },
   payChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
@@ -263,9 +262,9 @@ const Skeleton = memo(() => {
   return (
     <View style={{ gap: 14 }}>
       <View style={{ flexDirection: 'row', gap: 10 }}>
-        {[0, 1, 2, 3].map(i => <Animated.View key={i} style={{ flex: 1, height: 80, borderRadius: 12, backgroundColor: '#E5E7EB', opacity: op }}/>)}
+        {[0, 1, 2, 3].map(i => <Animated.View key={i} style={{ flex: 1, height: 80, borderRadius: 12, backgroundColor: C.surfaceAlt, opacity: op }}/>)}
       </View>
-      {[0, 1, 2].map(i => <Animated.View key={i} style={{ height: 130, borderRadius: 12, backgroundColor: '#E5E7EB', opacity: op }}/>)}
+      {[0, 1, 2].map(i => <Animated.View key={i} style={{ height: 130, borderRadius: 12, backgroundColor: C.surfaceAlt, opacity: op }}/>)}
     </View>
   );
 });
@@ -378,15 +377,12 @@ export default function MissionsScreen() {
               <Text style={{ fontSize: 22, fontWeight: '800', color: C.text }}>Missions</Text>
               <Text style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>{kpis.total} mission{kpis.total !== 1 ? 's' : ''}</Text>
             </View>
-            <TouchableOpacity
-              style={{ backgroundColor: PRIMARY, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12,
-                       shadowColor: PRIMARY, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 }}
-              onPress={() => router.push('/(organizer)/create-event' as any)}
-              activeOpacity={0.82}
-            >
-              <Ionicons name="add" size={16} color="#FFF"/>
-              <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Créer</Text>
-            </TouchableOpacity>
+            <Aura color={AURA.primaryGlow} radius={12} onPress={() => router.push('/(organizer)/create-event' as any)}>
+              <View style={{ backgroundColor: PRIMARY, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 }}>
+                <Ionicons name="add" size={16} color="#FFF"/>
+                <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Créer</Text>
+              </View>
+            </Aura>
           </View>
 
           {/* Filter tabs */}
@@ -419,9 +415,9 @@ export default function MissionsScreen() {
             {/* ── KPI STRIP ── */}
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
               <KPICard icon="briefcase-outline"  value={kpis.total}       label="Total"        color={PRIMARY}  bg={P_GHOST}/>
-              <KPICard icon="time-outline"        value={kpis.pending}     label="En attente"   color={WARNING}  bg="rgba(245,158,11,0.08)"/>
-              <KPICard icon="timer-outline"       value={kpis.totalHours} label="Heures"       color={BLUE}     bg="rgba(59,130,246,0.08)" suffix="h"/>
-              <KPICard icon="checkmark-circle-outline" value={kpis.paid}  label="Payées"       color={SUCCESS}  bg="rgba(16,185,129,0.08)"/>
+              <KPICard icon="time-outline"        value={kpis.pending}     label="En attente"   color={WARNING}  bg={AURA.warningGhost}/>
+              <KPICard icon="timer-outline"       value={kpis.totalHours} label="Heures"       color={BLUE}     bg={AURA.cyanGhost} suffix="h"/>
+              <KPICard icon="checkmark-circle-outline" value={kpis.paid}  label="Payées"       color={SUCCESS}  bg={AURA.successGhost}/>
             </View>
 
             {/* ── FINANCE SUMMARY ── */}
@@ -476,14 +472,11 @@ export default function MissionsScreen() {
                     : 'Changez d\'onglet pour voir d\'autres missions.'}
                 </Text>
                 {tab === 'all' && (
-                  <TouchableOpacity
-                    style={{ backgroundColor: PRIMARY, paddingHorizontal: 22, paddingVertical: 12, borderRadius: 10,
-                             shadowColor: PRIMARY, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 }}
-                    onPress={() => router.push('/(organizer)/create-event' as any)}
-                    activeOpacity={0.82}
-                  >
-                    <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 14 }}>+ Créer une mission</Text>
-                  </TouchableOpacity>
+                  <Aura color={AURA.primaryGlow} radius={10} onPress={() => router.push('/(organizer)/create-event' as any)}>
+                    <View style={{ backgroundColor: PRIMARY, paddingHorizontal: 22, paddingVertical: 12, borderRadius: 10 }}>
+                      <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 14 }}>+ Créer une mission</Text>
+                    </View>
+                  </Aura>
                 )}
               </View>
             ) : (

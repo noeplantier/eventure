@@ -30,6 +30,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient }    from 'expo-linear-gradient';
 import { supabase }          from '@/lib/supabase';
 import { AuthProvider }      from '@/contexts/AuthContext';
+import { AURA }              from '@/constants/aura-theme';
 import CustomNavBar          from '../components/CustomNavBar';
 import StaffNavBar           from '../components/StaffNavBar';
 
@@ -48,7 +49,7 @@ const PARTICLES = Array.from({ length: 80 }, (_, i) => ({
   r:    i % 7 === 0 ? 1.8 : i % 3 === 0 ? 1.1 : 0.6,
   op:   0.10 + (i % 8) * 0.05,
   // Vert pour les grandes, or pour les moyennes, blanc pour les petites
-  col:  i % 7 === 0 ? '#00D97E' : i % 3 === 0 ? '#F5C842' : 'rgba(255,255,255,0.70)',
+  col:  i % 7 === 0 ? AURA.primary : i % 3 === 0 ? AURA.warning : 'rgba(255,255,255,0.70)',
 }));
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -81,7 +82,7 @@ const ScreenshotOverlay = React.memo(function ScreenshotOverlay({
     >
       {/* Fond dégradé Eventure — identique structure Universe mais vert sombre */}
       <LinearGradient
-        colors={['#020A06', '#051A0E', '#0A2218', '#020A06']}
+        colors={[AURA.bg, AURA.bgElevated, AURA.surface, AURA.bg]}
         locations={[0, 0.35, 0.70, 1]}
         style={StyleSheet.absoluteFill}
       />
@@ -330,19 +331,19 @@ export default function RootLayout() {
 
         {/* ── Organisateur — modals / push ── */}
         <Stack.Screen name="(organizer)/create-event"
-          options={{ animation: 'slide_from_bottom', gestureDirection: 'vertical', contentStyle: { backgroundColor: '#020A06' } }}/>
+          options={{ animation: 'slide_from_bottom', gestureDirection: 'vertical', contentStyle: { backgroundColor: AURA.bg } }}/>
         <Stack.Screen name="(organizer)/event/[id]"
           options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom' }}/>
         <Stack.Screen name="(organizer)/mission/[id]"
           options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom' }}/>
         <Stack.Screen name="(organizer)/applications"
-          options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom', contentStyle: { backgroundColor: '#020A06' } }}/>
+          options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom', contentStyle: { backgroundColor: AURA.bg } }}/>
         <Stack.Screen name="(organizer)/profile"
-          options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom', contentStyle: { backgroundColor: '#020A06' } }}/>
+          options={{ animation: Platform.OS === 'ios' ? 'default' : 'fade_from_bottom', contentStyle: { backgroundColor: AURA.bg } }}/>
         <Stack.Screen name="(organizer)/edit-profile"
-          options={{ animation: 'slide_from_bottom', gestureDirection: 'vertical', contentStyle: { backgroundColor: '#020A06' } }}/>
+          options={{ animation: 'slide_from_bottom', gestureDirection: 'vertical', contentStyle: { backgroundColor: AURA.bg } }}/>
         <Stack.Screen name="(organizer)/analytics"
-          options={{ animation: 'slide_from_bottom', gestureDirection: 'vertical', contentStyle: { backgroundColor: '#020A06' } }}/>
+          options={{ animation: 'slide_from_bottom', gestureDirection: 'vertical', contentStyle: { backgroundColor: AURA.bg } }}/>
 
         {/* ── Staff ── */}
         <Stack.Screen name="(staff)/dashboard"

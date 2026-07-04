@@ -11,9 +11,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, usePathname } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { getCurrentStaffId } from '@/services/api';
+import { AURA } from '@/constants/aura-theme';
 
-const ACTIVE   = '#A78BFA';
-const INACTIVE = 'rgba(255,255,255,0.45)';
+const ACTIVE   = AURA.secondary;
+const INACTIVE = AURA.textMuted;
 
 interface TabDef {
   key: string;
@@ -120,19 +121,19 @@ const ns = StyleSheet.create({
   bar: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     height: Platform.OS === 'ios' ? 82 : 66,
-    overflow: 'hidden', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden', borderTopWidth: 1, borderTopColor: AURA.border,
   },
   blur: {
     flex: 1, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-start',
-    paddingTop: 8, paddingHorizontal: 4, backgroundColor: 'rgba(7,12,23,0.90)',
+    paddingTop: 8, paddingHorizontal: 4, backgroundColor: 'rgba(10,12,16,0.88)',
   },
   tab: { flex: 1, alignItems: 'center' },
   tabInner: { alignItems: 'center', gap: 2, paddingTop: 2 },
   activeDot: { position: 'absolute', top: -8, width: 24, height: 3, borderRadius: 2, backgroundColor: ACTIVE },
   iconWrap: { width: 40, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 10, position: 'relative' },
-  iconWrapActive: { width: 40, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: 'rgba(167,139,250,0.14)', position: 'relative' },
+  iconWrapActive: { width: 40, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: AURA.secondaryGhost, position: 'relative' },
   label: { fontSize: 10, fontWeight: '500', color: INACTIVE, letterSpacing: 0.1 },
   labelActive: { color: ACTIVE, fontWeight: '700' },
-  badge: { position: 'absolute', top: 0, right: 0, minWidth: 15, height: 15, borderRadius: 8, backgroundColor: '#EF4444', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: '#070C17' },
+  badge: { position: 'absolute', top: 0, right: 0, minWidth: 15, height: 15, borderRadius: 8, backgroundColor: AURA.danger, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: AURA.bg },
   badgeTxt: { color: '#FFFFFF', fontSize: 8, fontWeight: '800' },
 });

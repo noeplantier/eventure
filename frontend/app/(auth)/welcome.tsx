@@ -9,19 +9,20 @@ import { Ionicons }       from '@expo/vector-icons';
 import { useRouter }      from 'expo-router';
 import { SafeAreaView }   from 'react-native-safe-area-context';
 import { supabase }       from '@/lib/supabase';
+import { AURA }           from '@/constants/aura-theme';
 
-const GREEN = '#00D97E';
+const GREEN = AURA.primary;
 const T = {
-  bg:     '#020A06',
-  navy:   '#0A2218',
-  white:  '#FFFFFF',
-  muted:  'rgba(255,255,255,0.50)',
-  faint:  'rgba(255,255,255,0.18)',
-  surf:   'rgba(255,255,255,0.06)',
-  border: 'rgba(0,217,126,0.18)',
+  bg:     AURA.bg,
+  navy:   AURA.surface,
+  white:  AURA.text,
+  muted:  AURA.textSub,
+  faint:  AURA.textMuted,
+  surf:   AURA.surfaceAlt,
+  border: AURA.primaryBorder,
   green:  GREEN,
-  gold:   '#F5C842',
-  red:    '#EF4444',
+  gold:   AURA.warning,
+  red:    AURA.danger,
 };
 
 export default function WelcomeScreen() {
@@ -95,7 +96,7 @@ export default function WelcomeScreen() {
 
   return (
     <View style={s.root}>
-      <LinearGradient colors={['#020A06','#051A0E','#020A06']} style={StyleSheet.absoluteFill}/>
+      <LinearGradient colors={[AURA.bg,AURA.bgElevated,AURA.bg]} style={StyleSheet.absoluteFill}/>
 
       {/* Halo vert */}
       <View style={s.halo}/>
@@ -217,7 +218,7 @@ export default function WelcomeScreen() {
                 disabled={loading}
               >
                 <LinearGradient
-                  colors={['rgba(0,217,126,0.35)','rgba(0,217,126,0.18)']}
+                  colors={['rgba(129,140,248,0.35)','rgba(129,140,248,0.18)']}
                   style={s.ctaGrad}
                 >
                   {loading
@@ -270,15 +271,15 @@ export default function WelcomeScreen() {
 
 const s = StyleSheet.create({
   root:        { flex:1, backgroundColor:T.bg },
-  halo:        { position:'absolute', top:'8%', left:'-20%', width:'140%', height:'40%', borderRadius:999, backgroundColor:'rgba(0,217,126,0.04)' },
+  halo:        { position:'absolute', top:'8%', left:'-20%', width:'140%', height:'40%', borderRadius:999, backgroundColor:'rgba(129,140,248,0.04)' },
   inner:       { flex:1, paddingHorizontal:24, justifyContent:'space-between', paddingTop:20, paddingBottom:32 },
   hero:        { alignItems:'center', gap:12, paddingTop:20, paddingBottom:28 },
-  logoBox:     { width:80, height:80, borderRadius:24, backgroundColor:'rgba(0,217,126,0.12)', alignItems:'center', justifyContent:'center', borderWidth:1.5, borderColor:'rgba(0,217,126,0.28)' },
+  logoBox:     { width:80, height:80, borderRadius:24, backgroundColor:'rgba(129,140,248,0.12)', alignItems:'center', justifyContent:'center', borderWidth:1.5, borderColor:'rgba(129,140,248,0.28)' },
   title:       { color:T.white, fontSize:34, fontWeight:'900', letterSpacing:-1 },
   sub:         { color:T.muted, fontSize:13, textAlign:'center' },
   tabs:        { flexDirection:'row', backgroundColor:T.surf, borderRadius:16, padding:4, marginBottom:24, borderWidth:StyleSheet.hairlineWidth, borderColor:T.border },
   tab:         { flex:1, paddingVertical:11, borderRadius:12, alignItems:'center' },
-  tabActive:   { backgroundColor:'rgba(0,217,126,0.18)', borderWidth:1, borderColor:'rgba(0,217,126,0.30)' },
+  tabActive:   { backgroundColor:'rgba(129,140,248,0.18)', borderWidth:1, borderColor:'rgba(129,140,248,0.30)' },
   tabTxt:      { color:T.muted, fontSize:13, fontWeight:'600' },
   tabTxtActive:{ color:GREEN, fontWeight:'800' },
   form:        { gap:16 },
@@ -286,9 +287,9 @@ const s = StyleSheet.create({
   label:       { color:T.muted, fontSize:11, fontWeight:'700', letterSpacing:0.5, textTransform:'uppercase' },
   inputRow:    { flexDirection:'row', alignItems:'center', gap:10, backgroundColor:T.surf, borderRadius:14, borderWidth:StyleSheet.hairlineWidth, borderColor:T.border, paddingHorizontal:14, paddingVertical:14 },
   input:       { flex:1, color:T.white, fontSize:15 },
-  errorBox:    { flexDirection:'row', alignItems:'center', gap:8, backgroundColor:'rgba(239,68,68,0.10)', borderRadius:12, padding:12, borderWidth:1, borderColor:'rgba(239,68,68,0.25)' },
+  errorBox:    { flexDirection:'row', alignItems:'center', gap:8, backgroundColor:'rgba(248,113,113,0.10)', borderRadius:12, padding:12, borderWidth:1, borderColor:'rgba(248,113,113,0.25)' },
   errorTxt:    { color:T.red, fontSize:12, fontWeight:'600', flex:1 },
-  cta:         { borderRadius:16, overflow:'hidden', borderWidth:1.5, borderColor:'rgba(0,217,126,0.40)' },
+  cta:         { borderRadius:16, overflow:'hidden', borderWidth:1.5, borderColor:'rgba(129,140,248,0.40)' },
   ctaGrad:     { flexDirection:'row', alignItems:'center', justifyContent:'center', gap:10, paddingVertical:16 },
   ctaTxt:      { color:GREEN, fontSize:16, fontWeight:'900' },
   forgotTxt:   { color:T.muted, fontSize:13, fontWeight:'600', textDecorationLine:'underline' },

@@ -32,29 +32,31 @@ import { Ionicons }       from '@expo/vector-icons';
 import { SafeAreaView }   from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker   from 'expo-image-picker';
-import DateTimePicker     from '@react-native-community/datetimepicker';
 import { supabase }       from '@/lib/supabase';
 import { getCurrentOrganizerId } from '@/services/api';
+import DateTimeField, { fmtDateTime } from '@/components/DateTimeField';
+import { AURA }           from '@/constants/aura-theme';
+import Aura               from '@/components/Aura';
 
-/* ─── Design tokens (identiques dashboard.tsx — Indigo Light) ───────────── */
-const BG      = '#F8FAFC';
-const PRIMARY = '#6366F1';
-const P_LIGHT = '#EEF2FF';
-const P_GHOST = 'rgba(99,102,241,0.08)';
-const PURPLE  = '#8B5CF6';
-const SUCCESS = '#10B981';
-const WARNING = '#F59E0B';
-const DANGER  = '#EF4444';
-const BLUE    = '#3B82F6';
+/* ─── Design tokens (Aura — dark, futuristic, professionnel) ─────────────── */
+const BG      = AURA.bg;
+const PRIMARY = AURA.primary;
+const P_LIGHT = AURA.primaryGhost;
+const P_GHOST = AURA.primaryGhost;
+const PURPLE  = AURA.secondary;
+const SUCCESS = AURA.success;
+const WARNING = AURA.warning;
+const DANGER  = AURA.danger;
+const BLUE    = AURA.cyan;
 const EDGE    = 16;
 
 const C = {
-  text:      '#111827',
-  textSub:   '#6B7280',
-  textMuted: '#9CA3AF',
-  border:    '#E5E7EB',
-  surface:   '#FFFFFF',
-  surfaceAlt:'#F1F5F9',
+  text:      AURA.text,
+  textSub:   AURA.textSub,
+  textMuted: AURA.textMuted,
+  border:    AURA.border,
+  surface:   AURA.surface,
+  surfaceAlt:AURA.surfaceAlt,
 } as const;
 
 /* ─── Constants ────────────────────────────────────────────────────────── */
@@ -66,7 +68,7 @@ const ROLE_PRESETS = [
 ];
 const TYPE_COLOR: Record<string,string> = {
   'Gala':WARNING,'Festival':SUCCESS,'Conférence':BLUE,'Mariage':'#EC4899',
-  'Séminaire':PURPLE,'Soirée':WARNING,'Concert':DANGER,'Sport':'#34D399',
+  'Séminaire':PURPLE,'Soirée':WARNING,'Concert':DANGER,'Sport':AURA.success,
 };
 
 /* ─── Types ────────────────────────────────────────────────────────────── */
@@ -104,7 +106,6 @@ const cs = StyleSheet.create({
   card: {
     backgroundColor: C.surface, borderRadius: 18, padding: 18, gap: 13,
     borderWidth: 1, borderColor: C.border,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
   },
 });
 
@@ -138,69 +139,6 @@ const inp = StyleSheet.create({
   input: { color: C.text, fontSize: 14, paddingVertical: 14, lineHeight: 20 },
 });
 
-const fmtDateTime = (iso: string) => iso
-  ? new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-  : '';
-
-/**
- * Date + heure — évite un champ texte libre (source du bug "invalid input
- * syntax for type timestamp" quand l'utilisateur tape un format inattendu).
- * Web : <input type="datetime-local"> natif. Natif : @react-native-community/datetimepicker.
- * `value`/`onChange` manipulent toujours une string ISO 8601 (ou '').
- */
-const DateTimeField = memo(({ value, onChange, placeholder }: { value: string; onChange: (iso: string) => void; placeholder: string }) => {
-  const [showPicker, setShowPicker] = useState(false);
-
-  if (Platform.OS === 'web') {
-    const toLocalInputValue = (iso: string) => {
-      if (!iso) return '';
-      const d = new Date(iso);
-      const pad = (n: number) => String(n).padStart(2, '0');
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    };
-    return (
-      <View style={inp.wrap}>
-        {React.createElement('input', {
-          type: 'datetime-local',
-          value: toLocalInputValue(value),
-          onChange: (e: any) => {
-            const v = e.target.value as string;
-            onChange(v ? new Date(v).toISOString() : '');
-          },
-          style: {
-            border: 'none', outline: 'none', background: 'transparent',
-            color: C.text, fontSize: 14, paddingTop: 14, paddingBottom: 14,
-            width: '100%', fontFamily: 'inherit',
-          },
-        })}
-      </View>
-    );
-  }
-
-  return (
-    <View>
-      <TouchableOpacity
-        style={[inp.wrap, { paddingVertical: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
-        onPress={() => setShowPicker(true)} activeOpacity={0.78}>
-        <Text style={{ color: value ? C.text : C.textMuted, fontSize: 14 }}>
-          {value ? fmtDateTime(value) : placeholder}
-        </Text>
-        <Ionicons name="calendar-outline" size={16} color={C.textSub}/>
-      </TouchableOpacity>
-      {showPicker && (
-        <DateTimePicker
-          value={value ? new Date(value) : new Date()}
-          mode="datetime"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={(event, selectedDate) => {
-            setShowPicker(false);
-            if (event.type !== 'dismissed' && selectedDate) onChange(selectedDate.toISOString());
-          }}
-        />
-      )}
-    </View>
-  );
-});
 
 /* ─── Step indicator ───────────────────────────────────────────────────── */
 const StepBar = memo(({ step, total }: { step: number; total: number }) => {
@@ -286,10 +224,13 @@ export default function CreateEventScreen() {
     try {
       const response = await fetch(uri);
       const blob = await response.blob();
-      const ext = uri.split('.').pop()?.split('?')[0]?.slice(0, 4) || 'jpg';
+      // L'URI peut être un data:/blob: URI sans extension exploitable (ex: data:image/png;base64,...) —
+      // on dérive l'extension du MIME type réel plutôt que de parser la chaîne de l'URI.
+      const mime = blob.type || 'image/jpeg';
+      const ext = mime.split('/').pop()?.split('+')[0] || 'jpg';
       const path = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
       const { error } = await supabase.storage.from('event-images').upload(path, blob, {
-        contentType: blob.type || 'image/jpeg',
+        contentType: mime,
         upsert: false,
       });
       if (error) throw error;
@@ -517,7 +458,7 @@ export default function CreateEventScreen() {
               <Text style={ds.cardTitle}>Rôles recherchés</Text>
               <TouchableOpacity
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 11, paddingVertical: 6,
-                  borderRadius: 10, backgroundColor: P_GHOST, borderWidth: 1, borderColor: 'rgba(99,102,241,0.25)' }}
+                  borderRadius: 10, backgroundColor: P_GHOST, borderWidth: 1, borderColor: AURA.primaryBorder }}
                 onPress={addRole} activeOpacity={0.78}>
                 <Ionicons name="add" size={14} color={PRIMARY}/>
                 <Text style={{ color: PRIMARY, fontSize: 12, fontWeight: '700' }}>Ajouter</Text>
@@ -717,25 +658,25 @@ export default function CreateEventScreen() {
 
           {errors.submit && (
             <View style={{
-              padding: 12, borderRadius: 12, backgroundColor: 'rgba(239,68,68,0.08)',
-              borderWidth: 1, borderColor: 'rgba(239,68,68,0.22)',
+              padding: 12, borderRadius: 12, backgroundColor: AURA.dangerGhost,
+              borderWidth: 1, borderColor: 'rgba(248,113,113,0.30)',
             }}>
               <Text style={{ color: DANGER, fontSize: 12 }}>{errors.submit}</Text>
             </View>
           )}
 
           {/* CTA buttons */}
-          <View style={{ gap: 10 }}>
+          <View style={{ gap: 10, marginBottom: 80 }}>
             {/* Publier — CTA principal */}
-            <TouchableOpacity
-              style={[ce.publishBtn, { opacity: saving ? 0.7 : 1 }]}
-              onPress={() => submit('published')} disabled={saving} activeOpacity={0.85}>
-              {saving
-                ? <ActivityIndicator color="#fff" size="small"/>
-                : <><Ionicons name="rocket-outline" size={18} color="#fff"/>
-                   <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16 }}>Publier la mission</Text></>
-              }
-            </TouchableOpacity>
+            <Aura color={AURA.primaryGlow} radius={16} onPress={() => submit('published')} disabled={saving} style={{ opacity: saving ? 0.7 : 1 }}>
+              <View style={ce.publishBtn}>
+                {saving
+                  ? <ActivityIndicator color="#fff" size="small"/>
+                  : <><Ionicons name="rocket-outline" size={18} color="#fff"/>
+                     <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16 }}>Publier la mission</Text></>
+                }
+              </View>
+            </Aura>
 
             {/* Brouillon */}
             <TouchableOpacity
@@ -756,7 +697,7 @@ export default function CreateEventScreen() {
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
 
         {/* ── NAV (glass) ── */}
-        <BlurView intensity={Platform.OS === 'ios' ? 50 : 25} tint="light" style={ds.navBlur}>
+        <BlurView intensity={Platform.OS === 'ios' ? 50 : 25} tint="dark" style={ds.navBlur}>
           <View style={ds.nav}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <TouchableOpacity onPress={() => router.back()} style={ds.navBtn} activeOpacity={0.78}>
@@ -791,7 +732,7 @@ export default function CreateEventScreen() {
 
         {/* ── BOTTOM NAV BUTTONS (glass) ── */}
         {step < 4 && (
-          <BlurView intensity={Platform.OS === 'ios' ? 60 : 30} tint="light" style={ce.bottomNavBlur}>
+          <BlurView intensity={Platform.OS === 'ios' ? 60 : 30} tint="dark" style={ce.bottomNavBlur}>
             <View style={ce.bottomNav}>
               {step > 1 ? (
                 <TouchableOpacity style={ce.prevBtn} onPress={goPrev} activeOpacity={0.78}>
@@ -799,14 +740,14 @@ export default function CreateEventScreen() {
                   <Text style={{ color: C.textSub, fontWeight: '600', fontSize: 14 }}>Retour</Text>
                 </TouchableOpacity>
               ) : <View style={{ flex: 1 }}/>}
-              <TouchableOpacity style={ce.nextBtn} onPress={goNext} activeOpacity={0.85}>
+              <Aura color={AURA.primaryGlow} radius={14} onPress={goNext} style={{ flex: 2 }}>
                 <View style={ce.nextGrad}>
                   <Text style={{ color: '#fff', fontWeight: '900', fontSize: 15 }}>
                     {step === 3 ? 'Récapitulatif' : 'Suivant'}
                   </Text>
                   <Ionicons name="arrow-forward" size={16} color="#fff"/>
                 </View>
-              </TouchableOpacity>
+              </Aura>
             </View>
           </BlurView>
         )}
@@ -818,7 +759,7 @@ export default function CreateEventScreen() {
 
 /* ─── Styles ───────────────────────────────────────────────────────────── */
 const ds = StyleSheet.create({
-  navBlur  : { borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: 'rgba(255,255,255,0.85)' },
+  navBlur  : { borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: 'rgba(10,12,16,0.80)' },
   nav      : { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: EDGE, paddingVertical: 12, paddingBottom: 8 },
   greet    : { color: C.textSub, fontSize: 11, fontWeight: '600' },
   title    : { color: C.text, fontSize: 18, fontWeight: '900', letterSpacing: -0.3 },
@@ -840,15 +781,14 @@ const ce = StyleSheet.create({
   recapCover: { width: '100%', height: 120, borderRadius: 14, marginBottom: 4 },
   publishBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    height: 56, borderRadius: 16, marginBottom: 80, backgroundColor: PRIMARY,
-    shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6,
+    height: 56, borderRadius: 16, backgroundColor: PRIMARY,
   },
   draftBtn  : { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 50, borderRadius: 14, backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border },
   bottomNavBlur: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, borderTopColor: C.border },
   bottomNav :{
     flexDirection: 'row', gap: 12, paddingHorizontal: EDGE,
     paddingBottom: Platform.OS === 'ios' ? 32 : 20, paddingTop: 14,
-    backgroundColor: 'rgba(255,255,255,0.75)',
+    backgroundColor: 'rgba(10,12,16,0.75)',
   },
   prevBtn   : {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,

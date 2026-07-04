@@ -19,7 +19,7 @@ export default function StaffProfile() {
 
   return (
     <View style={s.root}>
-      <LinearGradient colors={['#0D1A35', '#070C17']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={['#141821', '#0A0C10']} style={StyleSheet.absoluteFill} />
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 110, gap: 20 }}>
           <View style={s.header}>
@@ -46,7 +46,7 @@ export default function StaffProfile() {
             )}
             {!user?.staff_id && (
               <View style={s.warnCard}>
-                <Ionicons name="link-outline" size={18} color="#F59E0B" />
+                <Ionicons name="link-outline" size={18} color="#FBBF24" />
                 <Text style={s.warnTxt}>Aucun compte staff lié à cet appareil.</Text>
               </View>
             )}
@@ -65,7 +65,7 @@ export default function StaffProfile() {
           </TouchableOpacity>
 
           <TouchableOpacity style={s.logoutBtn} onPress={handleLogout} activeOpacity={0.85}>
-            <Ionicons name="log-out-outline" size={22} color="#EF4444" />
+            <Ionicons name="log-out-outline" size={22} color="#F87171" />
             <Text style={s.logoutTxt}>Se déconnecter</Text>
           </TouchableOpacity>
         </ScrollView>
@@ -80,16 +80,16 @@ const s = StyleSheet.create({
   backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.06)' },
   headerTitle: { color: '#fff', fontSize: 17, fontWeight: '800' },
   identityCard: { alignItems: 'center', gap: 8, paddingVertical: 24 },
-  avatar: { width: 84, height: 84, borderRadius: 42, borderWidth: 2, borderColor: 'rgba(167,139,250,0.5)' },
+  avatar: { width: 84, height: 84, borderRadius: 42, borderWidth: 2, borderColor: 'rgba(196,181,253,0.5)' },
   name: { color: '#fff', fontSize: 20, fontWeight: '900', marginTop: 6 },
-  roleBadge: { backgroundColor: 'rgba(167,139,250,0.16)', borderWidth: 1, borderColor: 'rgba(167,139,250,0.35)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 },
-  roleTxt: { color: '#A78BFA', fontSize: 12, fontWeight: '700' },
+  roleBadge: { backgroundColor: 'rgba(196,181,253,0.16)', borderWidth: 1, borderColor: 'rgba(196,181,253,0.35)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 },
+  roleTxt: { color: '#C4B5FD', fontSize: 12, fontWeight: '700' },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
   metaTxt: { color: 'rgba(255,255,255,0.5)', fontSize: 13 },
-  warnCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(245,158,11,0.10)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.30)', borderRadius: 14, padding: 12, marginTop: 12 },
-  warnTxt: { color: '#F59E0B', fontSize: 12, fontWeight: '600', flex: 1 },
+  warnCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(251,191,36,0.10)', borderWidth: 1, borderColor: 'rgba(251,191,36,0.30)', borderRadius: 14, padding: 12, marginTop: 12 },
+  warnTxt: { color: '#FBBF24', fontSize: 12, fontWeight: '600', flex: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', padding: 16 },
   rowTxt: { color: '#fff', fontSize: 14, fontWeight: '600', flex: 1 },
-  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 56, borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(239,68,68,0.4)', backgroundColor: 'rgba(239,68,68,0.10)', marginTop: 8 },
-  logoutTxt: { color: '#EF4444', fontSize: 16, fontWeight: '800' },
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 56, borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(248,113,113,0.4)', backgroundColor: 'rgba(248,113,113,0.10)', marginTop: 8 },
+  logoutTxt: { color: '#F87171', fontSize: 16, fontWeight: '800' },
 });

@@ -16,15 +16,17 @@ import { SafeAreaView }   from 'react-native-safe-area-context';
 import { useRouter }      from 'expo-router';
 import { supabase }       from '@/lib/supabase';
 import { getCurrentOrganizerId } from '@/services/api';
+import { AURA } from '@/constants/aura-theme';
+import Aura from '@/components/Aura';
 
 const { width: SW } = Dimensions.get('window');
-const BG='#020A06';const GREEN='#00D97E';const GOLD='#F5C842';
+const BG=AURA.bg;const GREEN=AURA.primary;const GOLD=AURA.warning;
 const T={
-  white:'#FFFFFF',offWhite:'rgba(255,255,255,0.88)',muted:'rgba(255,255,255,0.50)',
-  faint:'rgba(255,255,255,0.18)',surf:'rgba(255,255,255,0.05)',surfHi:'rgba(255,255,255,0.09)',
-  border:'rgba(0,217,126,0.12)',borderHi:'rgba(0,217,126,0.28)',
-  greenDim:'rgba(0,217,126,0.12)',goldDim:'rgba(245,200,66,0.12)',goldBd:'rgba(245,200,66,0.28)',
-  amber:'#F59E0B',red:'#EF4444',navy:'#0A2218',
+  white:AURA.text,offWhite:AURA.text,muted:AURA.textSub,
+  faint:AURA.textMuted,surf:AURA.surfaceAlt,surfHi:AURA.surface,
+  border:AURA.border,borderHi:AURA.primaryBorder,
+  greenDim:AURA.primaryGhost,goldDim:AURA.warningGhost,goldBd:'rgba(251,191,36,0.30)',
+  amber:AURA.warning,red:AURA.danger,navy:AURA.surface,
 } as const;
 const EDGE=20;
 
@@ -43,7 +45,7 @@ interface ReviewRow { id:string; rating:number; comment:string|null; created_at:
 interface OrgStats  { active_missions:number; done_missions:number; total_missions:number; pending_applications:number; accepted_applications:number; total_staff_hired:number; total_paid:number; response_rate:number; rating:number; }
 
 // ─── Particle Background ──────────────────────────────────────────────────────
-const PCOLS=['#00D97E','rgba(0,217,126,0.50)','#F5C842','rgba(245,200,66,0.45)','rgba(255,255,255,0.20)'];
+const PCOLS=[AURA.primary,'rgba(129,140,248,0.50)',AURA.warning,'rgba(251,191,36,0.45)','rgba(255,255,255,0.20)'];
 const rnd=(a:number,b:number)=>a+Math.random()*(b-a);
 const PTS=Array.from({length:22},(_,i)=>({id:i,x:rnd(0,SW),y:rnd(0,800),sz:i%7===0?1.8:i%3===0?1.1:0.6,col:PCOLS[i%PCOLS.length],op:0.06+i%8*0.04,spd:3000+i*200,del:i*170}));
 const FPt=memo(function FPt({p}:{p:typeof PTS[0]}){
@@ -53,9 +55,9 @@ const FPt=memo(function FPt({p}:{p:typeof PTS[0]}){
 });
 const ParticleBg=memo(()=>(
   <View style={StyleSheet.absoluteFill} pointerEvents="none">
-    <LinearGradient colors={[BG,'#051A0E','#061408',BG]} style={StyleSheet.absoluteFill}/>
-    <View style={{position:'absolute',top:'8%',left:'15%',width:SW*.70,height:SW*.70,borderRadius:SW*.35,backgroundColor:'rgba(0,217,126,0.04)'}}/>
-    <View style={{position:'absolute',bottom:'5%',right:'-15%',width:SW*.65,height:SW*.65,borderRadius:SW*.32,backgroundColor:'rgba(245,200,66,0.03)'}}/>
+    <LinearGradient colors={[BG,AURA.bgElevated,AURA.surface,BG]} style={StyleSheet.absoluteFill}/>
+    <View style={{position:'absolute',top:'8%',left:'15%',width:SW*.70,height:SW*.70,borderRadius:SW*.35,backgroundColor:'rgba(129,140,248,0.05)'}}/>
+    <View style={{position:'absolute',bottom:'5%',right:'-15%',width:SW*.65,height:SW*.65,borderRadius:SW*.32,backgroundColor:'rgba(251,191,36,0.04)'}}/>
     {PTS.map(p=><FPt key={p.id} p={p}/>)}
   </View>
 ));
@@ -65,7 +67,7 @@ const fmtBudget=(n:number)=>n>=1000?`${(n/1000).toFixed(0)}K€`:`${Math.round(n
 const fmtDate=(iso:string)=>new Date(iso).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
 const EVENT_TYPE_ICONS:Record<string,keyof typeof Ionicons.glyphMap>={wedding:'heart-outline',corporate:'business-outline',concert:'musical-notes-outline',sport:'trophy-outline',gala:'sparkles-outline',festival:'color-palette-outline',private:'home-outline',other:'calendar-outline'};
 const EVENT_TYPE_COLORS:Record<string,string>={wedding:'#F472B6',corporate:'#38BDF8',concert:'#A78BFA',sport:'#FB923C',gala:GOLD,festival:'#4ADE80',private:'#94A3B8',other:T.muted};
-const STATUS_CFG:Record<string,{c:string;bg:string;l:string}>={draft:{c:T.muted,bg:'rgba(255,255,255,0.06)',l:'Brouillon'},published:{c:GREEN,bg:'rgba(0,217,126,0.14)',l:'En ligne'},closed:{c:T.amber,bg:'rgba(245,158,11,0.14)',l:'Complet'},done:{c:T.faint,bg:'rgba(255,255,255,0.05)',l:'Terminé'},cancelled:{c:T.red,bg:'rgba(239,68,68,0.10)',l:'Annulé'}};
+const STATUS_CFG:Record<string,{c:string;bg:string;l:string}>={draft:{c:T.muted,bg:'rgba(255,255,255,0.06)',l:'Brouillon'},published:{c:GREEN,bg:'rgba(129,140,248,0.16)',l:'En ligne'},closed:{c:T.amber,bg:'rgba(245,158,11,0.14)',l:'Complet'},done:{c:T.faint,bg:'rgba(255,255,255,0.05)',l:'Terminé'},cancelled:{c:T.red,bg:'rgba(239,68,68,0.10)',l:'Annulé'}};
 
 // ─── Event Card ───────────────────────────────────────────────────────────────
 const EventCard=memo(function EventCard({e,onPress}:{e:EventRow;onPress:()=>void}){
@@ -75,7 +77,7 @@ const EventCard=memo(function EventCard({e,onPress}:{e:EventRow;onPress:()=>void
   const col=EVENT_TYPE_COLORS[e.type]??T.muted;
   return(
     <TouchableOpacity style={ec.card} onPress={onPress} activeOpacity={0.85}>
-      <LinearGradient colors={['rgba(0,217,126,0.07)','rgba(0,217,126,0.01)']} style={StyleSheet.absoluteFillObject}/>
+      <LinearGradient colors={['rgba(129,140,248,0.10)','rgba(129,140,248,0.02)']} style={StyleSheet.absoluteFillObject}/>
       <View style={ec.top}>
         <View style={[ec.icon,{backgroundColor:`${col}18`}]}><Ionicons name={icon} size={14} color={col}/></View>
         <View style={{flex:1,gap:2}}>
@@ -120,7 +122,7 @@ const StaffRow=memo(function StaffRow({s,onChat}:{s:StaffRow;onChat:()=>void}){
   const [imgErr,setImgErr]=useState(false);const stars=Math.round(s.rating);
   return(
     <View style={{flexDirection:'row',alignItems:'center',gap:10,paddingVertical:11,borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:T.border}}>
-      {s.avatar_url&&!imgErr?<Image source={{uri:s.avatar_url}} style={{width:42,height:42,borderRadius:21}} resizeMode="cover" onError={()=>setImgErr(true)}/>:<View style={{width:42,height:42,borderRadius:21,backgroundColor:'rgba(0,217,126,0.10)',alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:T.border}}><Ionicons name="person-outline" size={18} color={GREEN}/></View>}
+      {s.avatar_url&&!imgErr?<Image source={{uri:s.avatar_url}} style={{width:42,height:42,borderRadius:21}} resizeMode="cover" onError={()=>setImgErr(true)}/>:<View style={{width:42,height:42,borderRadius:21,backgroundColor:'rgba(129,140,248,0.14)',alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:T.border}}><Ionicons name="person-outline" size={18} color={GREEN}/></View>}
       <View style={{flex:1,gap:2}}>
         <Text style={{color:T.white,fontSize:13,fontWeight:'700'}}>{s.display_name}</Text>
         <Text style={{color:T.muted,fontSize:10}}>{Array.isArray(s.role)?s.role[0]:s.role} · {s.missions_count} missions</Text>
@@ -291,10 +293,10 @@ export default function OrganizerProfileScreen() {
               {/* Avatar */}
               <TouchableOpacity onPress={()=>router.push('/(organizer)/edit-profile' as any)} activeOpacity={0.82}>
                 <View style={{position:'relative',width:86,height:86,alignItems:'center',justifyContent:'center'}}>
-                  <Animated.View style={{position:'absolute',width:86,height:86,borderRadius:43,borderWidth:1.5,borderColor:'rgba(0,217,126,0.45)',transform:[{scale:ringAnim}]}}/>
-                  {profile.avatar_url&&!imgErr
+                  <Animated.View style={{position:'absolute',width:86,height:86,borderRadius:43,borderWidth:1.5,borderColor:'rgba(129,140,248,0.45)',transform:[{scale:ringAnim}]}}/>
+                  {!!profile.avatar_url&&!imgErr
                     ?<Image source={{uri:profile.avatar_url}} style={{width:78,height:78,borderRadius:39}} resizeMode="cover" onError={()=>setImgErr(true)}/>
-                    :<View style={{width:78,height:78,borderRadius:39,backgroundColor:T.navy,alignItems:'center',justifyContent:'center',borderWidth:1.5,borderColor:T.border,backgroundColor:'rgba(0,217,126,0.08)'}}>
+                    :<View style={{width:78,height:78,borderRadius:39,alignItems:'center',justifyContent:'center',borderWidth:1.5,borderColor:T.border,backgroundColor:'rgba(129,140,248,0.12)'}}>
                        <Text style={{color:GREEN,fontSize:24,fontWeight:'900'}}>{init}</Text>
                      </View>
                   }
@@ -308,8 +310,8 @@ export default function OrganizerProfileScreen() {
               {/* Info */}
               <View style={{flex:1,paddingTop:2,gap:4}}>
                 <Text style={{color:T.white,fontSize:18,fontWeight:'900',letterSpacing:-0.4}} numberOfLines={1}>{dn}</Text>
-                {profile.display_name&&profile.company_name&&profile.display_name!==profile.company_name&&<Text style={{color:T.muted,fontSize:11}}>{profile.display_name}</Text>}
-                {profile.location&&<View style={{flexDirection:'row',alignItems:'center',gap:4}}><Ionicons name="location-outline" size={10} color={T.muted}/><Text style={{color:T.muted,fontSize:10}}>{profile.location}</Text></View>}
+                {!!(profile.display_name&&profile.company_name&&profile.display_name!==profile.company_name)&&<Text style={{color:T.muted,fontSize:11}}>{profile.display_name}</Text>}
+                {!!profile.location&&<View style={{flexDirection:'row',alignItems:'center',gap:4}}><Ionicons name="location-outline" size={10} color={T.muted}/><Text style={{color:T.muted,fontSize:10}}>{profile.location}</Text></View>}
                 <View style={{flexDirection:'row',alignItems:'center',gap:7,marginTop:2}}>
                   <View style={{flexDirection:'row',alignItems:'center',gap:3,paddingHorizontal:8,paddingVertical:3,borderRadius:9,backgroundColor:T.goldDim,borderWidth:StyleSheet.hairlineWidth,borderColor:T.goldBd}}>
                     <Ionicons name="star" size={10} color={GOLD}/>
@@ -330,11 +332,11 @@ export default function OrganizerProfileScreen() {
           {!!profile.bio&&<Text style={{color:T.muted,fontSize:12.5,lineHeight:18,paddingHorizontal:EDGE,marginBottom:12}}>{profile.bio}</Text>}
 
           {/* Socials */}
-          {(profile.website||profile.email||profile.phone)&&(
+          {!!(profile.website||profile.email||profile.phone)&&(
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{paddingHorizontal:EDGE,gap:7,paddingBottom:14}}>
-              {profile.website&&<TouchableOpacity style={ps.socialBtn} onPress={()=>Linking.openURL(profile.website).catch(()=>{})} activeOpacity={0.78}><Ionicons name="globe-outline" size={13} color={T.muted}/><Text style={ps.socialTxt}>Site web</Text></TouchableOpacity>}
-              {profile.email&&<TouchableOpacity style={ps.socialBtn} onPress={()=>Linking.openURL(`mailto:${profile.email}`).catch(()=>{})} activeOpacity={0.78}><Ionicons name="mail-outline" size={13} color={T.muted}/><Text style={ps.socialTxt}>Email</Text></TouchableOpacity>}
-              {profile.phone&&<TouchableOpacity style={ps.socialBtn} onPress={()=>Linking.openURL(`tel:${profile.phone}`).catch(()=>{})} activeOpacity={0.78}><Ionicons name="call-outline" size={13} color={T.muted}/><Text style={ps.socialTxt}>Appeler</Text></TouchableOpacity>}
+              {!!profile.website&&<TouchableOpacity style={ps.socialBtn} onPress={()=>Linking.openURL(profile.website).catch(()=>{})} activeOpacity={0.78}><Ionicons name="globe-outline" size={13} color={T.muted}/><Text style={ps.socialTxt}>Site web</Text></TouchableOpacity>}
+              {!!profile.email&&<TouchableOpacity style={ps.socialBtn} onPress={()=>Linking.openURL(`mailto:${profile.email}`).catch(()=>{})} activeOpacity={0.78}><Ionicons name="mail-outline" size={13} color={T.muted}/><Text style={ps.socialTxt}>Email</Text></TouchableOpacity>}
+              {!!profile.phone&&<TouchableOpacity style={ps.socialBtn} onPress={()=>Linking.openURL(`tel:${profile.phone}`).catch(()=>{})} activeOpacity={0.78}><Ionicons name="call-outline" size={13} color={T.muted}/><Text style={ps.socialTxt}>Appeler</Text></TouchableOpacity>}
             </ScrollView>
           )}
         </SafeAreaView>
@@ -407,8 +409,8 @@ export default function OrganizerProfileScreen() {
               )}
               {events.length===0&&(
                 <View style={{alignItems:'center',paddingTop:50,gap:14}}>
-                  <View style={{width:88,height:88,borderRadius:44,backgroundColor:'rgba(0,217,126,0.08)',alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:T.border}}>
-                    <Ionicons name="calendar-outline" size={38} color="rgba(0,217,126,0.45)"/>
+                  <View style={{width:88,height:88,borderRadius:44,backgroundColor:'rgba(129,140,248,0.12)',alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:T.border}}>
+                    <Ionicons name="calendar-outline" size={38} color="rgba(129,140,248,0.45)"/>
                   </View>
                   <Text style={{color:T.white,fontSize:17,fontWeight:'800',textAlign:'center'}}>Aucune mission encore</Text>
                   <Text style={{color:T.muted,fontSize:13,textAlign:'center'}}>Créez votre première mission pour commencer à recruter</Text>
@@ -465,7 +467,7 @@ export default function OrganizerProfileScreen() {
                         <View style={{flexDirection:'row',gap:1}}>{[1,2,3,4,5].map(i=><Ionicons key={i} name={i<=r.rating?'star':'star-outline'} size={10} color={i<=r.rating?GOLD:T.faint}/>)}</View>
                         <Text style={{color:T.faint,fontSize:9}}>{new Date(r.created_at).toLocaleDateString('fr-FR')}</Text>
                       </View>
-                      {r.comment&&<Text style={{color:T.muted,fontSize:12,lineHeight:16,fontStyle:'italic'}}>"{r.comment}"</Text>}
+                      {!!r.comment&&<Text style={{color:T.muted,fontSize:12,lineHeight:16,fontStyle:'italic'}}>"{r.comment}"</Text>}
                     </View>
                   ))
                 }
@@ -500,8 +502,8 @@ export default function OrganizerProfileScreen() {
             {loading?<ActivityIndicator color={GREEN} style={{marginTop:30}}/>:
              staff.length===0?(
               <View style={{alignItems:'center',paddingTop:50,gap:14}}>
-                <View style={{width:88,height:88,borderRadius:44,backgroundColor:'rgba(0,217,126,0.08)',alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:T.border}}>
-                  <Ionicons name="people-outline" size={38} color="rgba(0,217,126,0.45)"/>
+                <View style={{width:88,height:88,borderRadius:44,backgroundColor:'rgba(129,140,248,0.12)',alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:T.border}}>
+                  <Ionicons name="people-outline" size={38} color="rgba(129,140,248,0.45)"/>
                 </View>
                 <Text style={{color:T.white,fontSize:17,fontWeight:'800',textAlign:'center'}}>Aucun staff encore recruté</Text>
                 <Text style={{color:T.muted,fontSize:13,textAlign:'center'}}>Publiez des missions et acceptez des candidatures</Text>
